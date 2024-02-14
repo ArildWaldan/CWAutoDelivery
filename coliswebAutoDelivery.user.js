@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Coliweb Livraison Calculator
 // @namespace    castorama.scripts/colisweb1
-// @version      1.5
+// @version      1.6
 // @description  Fetch and log package specifications
 // @author       Arnaud D.
 // @match        https://prod-agent.castorama.fr/*
@@ -124,28 +124,56 @@ function fetchClientInfos() {
 
 
 
-// Function to fetch geocode data
 async function fetchGeocodeData(address) {
     console.log("Fetching geocode data for address:", address);
-    const url = `https://geocode.maps.co/search?q=${encodeURIComponent(address)}&api_key=65ae97aa4417a328160769gcb8adb4f`;
-    console.log("Requesting Geocode Data from URL:", url);
-    try {
-        const responseText = await makeCORSRequest(url, "GET", {}, null);
-        const responseJson = JSON.parse(responseText);
-        if (responseJson && responseJson.length > 0) {
-            const latitude = responseJson[0].lat;
-            const longitude = responseJson[0].lon;
-            console.log("Latitude:", latitude, "Longitude:", longitude);
-            return { latitude, longitude };
-        } else {
-            console.log("No geocode data found for the address");
-            Notification("","Problème avec l'adresse");
-            return null;
+
+    // Helper function to attempt fetching geocode data with a given address
+    async function attemptGeocode(queryAddress) {
+        const url = `https://geocode.maps.co/search?q=${encodeURIComponent(queryAddress)}&api_key=65ae97aa4417a328160769gcb8adb4f`;
+        console.log("Requesting Geocode Data from URL:", url);
+        try {
+            const responseText = await makeCORSRequest(url, "GET", {}, null);
+            const responseJson = JSON.parse(responseText);
+            if (responseJson && responseJson.length > 0) {
+                const latitude = responseJson[0].lat;
+                const longitude = responseJson[0].lon;
+                console.log("Latitude:", latitude, "Longitude:", longitude);
+                return { latitude, longitude };
+            }
+        } catch (error) {
+            console.error("Error fetching geocode data:", error);
         }
-    } catch (error) {
-        console.error("Error fetching geocode data:", error);
         return null;
     }
+
+    // Initial attempt with full address
+    let geoData = await attemptGeocode(address);
+    if (geoData) return geoData;
+
+    // Attempt without house number
+    const addressWithoutHouseNumber = address.replace(/^\d+\s*/, '');
+    console.log("Requesting Geocode Data from URL:",addressWithoutHouseNumber );
+    await delay(1001);
+    geoData = await attemptGeocode(addressWithoutHouseNumber);
+    if (geoData) return geoData;
+
+    // Modify regex to assume city follows the 5-digit postal code
+    const cityRegex = /\b\d{5}\b\s*(.*)/;
+    const match = address.match(cityRegex);
+    if (match && match[1]) {
+        // This captures everything after the postal code, assumed to be the city
+        const city = match[1].trim();
+        const postalCode = match[0].trim().substring(0, 5); // Extracts the postal code
+         console.log("Requesting Geocode Data from URL:",`${city} ${postalCode}` );
+        await delay(1001);
+        geoData = await attemptGeocode(`${city} ${postalCode}`);
+        if (geoData) return geoData;
+    }
+
+    // If all attempts fail, return null and optionally notify the user
+    console.log("No geocode data found for the address after multiple attempts");
+    notification("", "Problème avec l'adresse - géolocalisation impossible");
+    return null;
 }
 
 
