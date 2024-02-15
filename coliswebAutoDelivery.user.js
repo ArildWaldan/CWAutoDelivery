@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Coliweb Livraison Calculator
 // @namespace    cstrm.scripts/colisweb1
-// @version      1.15
+// @version      1.16
 // @downloadURL  https://github.com/ArildWaldan/CWAutoDelivery/raw/main/coliswebAutoDelivery.user.js
 // @updateURL    https://github.com/ArildWaldan/CWAutoDelivery/raw/main/coliswebAutoDelivery.user.js
 // @description  Fetch and log package specifications
@@ -279,8 +279,9 @@ function fetchClientInfos() {
     console.log("Fixed Phone: ", phoneFixed);
     console.log("Mobile Phone: ", phoneMobile);
     const phone = phoneMobile || phoneFixed;
+    console.log("Phone:", phone);
 
-    return {firstName, name, phoneFixed, phoneMobile};
+    return {firstName, name, phoneFixed, phoneMobile, phone};
 }
 
 
