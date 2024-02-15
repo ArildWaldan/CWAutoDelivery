@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Coliweb Livraison Calculator
 // @namespace    cstrm.scripts/colisweb1
-// @version      1.6
+// @version      1.7
 // @description  Fetch and log package specifications
 // @author       Arnaud D.
 // @match        https://prod-agent.castorama.fr/*
