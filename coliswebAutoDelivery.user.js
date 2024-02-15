@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Coliweb Livraison Calculator
 // @namespace    cstrm.scripts/colisweb1
-// @version      1.12
+// @version      1.13
 // @downloadURL  https://github.com/ArildWaldan/CWAutoDelivery/raw/main/coliswebAutoDelivery.user.js
 // @updateURL    https://github.com/ArildWaldan/CWAutoDelivery/raw/main/coliswebAutoDelivery.user.js
 // @description  Fetch and log package specifications
@@ -226,10 +226,10 @@ function createButton({ id, textContent, styles, onClick }) {
 
 // Centralized function to add both buttons
 function setupCustomButtons() {
-    const estimateButton = createButton({
+    estimateButton = createButton({
         id: 'Estimer-livraison',
         textContent: 'Estimer prix Colisweb',
-        styles: { marginLeft: '48px', marginTop: '0px' },
+        styles: { marginLeft: '48px', marginTop: '0px', width: '148px' },
         onClick: EstimerButtonAction
     });
 
@@ -266,7 +266,7 @@ function setupCustomButtons() {
 
 // Handler for the 'Estimer prix Colisweb' button click
 async function EstimerButtonAction() {
-    estimateButton.textContent == 'Calcul en cours...';
+    estimateButton.textContent = 'Calcul en cours...';
     const data = fetchEANsAndQuantities();
     const { address, postalCode } = fetchClientAddress();
     console.log("Fetched Postal Code:", postalCode);
@@ -863,19 +863,19 @@ async function onLivraisonButtonPress(eans, geocodeData, postalCode, firstName, 
                 deliveryButton.style.display = 'inline-block'; // Correctly reference and manipulate the global button
             }
             if (estimateButton) {
-                estimateButton.textContent == 'Calcul en cours...';
+                estimateButton.textContent = 'Estimer prix Colisweb';
             }
 
         } else {
             console.error("Failed to fetch delivery options after several attempts.")
             notification("alert", "Veuillez vous reconnecter à Colisweb", "Cliquez ici", "https://bo.production.colisweb.com/login");
-            estimateButton.textContent == 'Calcul en cours...';
+            estimateButton.textContent = 'Estimer prix Colisweb';
         }
 
     } catch (error) {
         console.error("An error occurred:", error);
         notification("alert", error);
-        estimateButton.textContent == 'Calcul en cours...';
+        estimateButton.textContent = 'Estimer prix Colisweb';
     }
 }
 
