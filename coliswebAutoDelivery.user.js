@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Coliweb Livraison Calculator
 // @namespace    cstrm.scripts/colisweb1
-// @version      1.13
+// @version      1.14
 // @downloadURL  https://github.com/ArildWaldan/CWAutoDelivery/raw/main/coliswebAutoDelivery.user.js
 // @updateURL    https://github.com/ArildWaldan/CWAutoDelivery/raw/main/coliswebAutoDelivery.user.js
 // @description  Fetch and log package specifications
@@ -47,6 +47,148 @@ async function makeCORSRequest(url, method, headers, payload) {
         });
     });
 }
+
+
+// Define the LoaderManager object
+const LoaderManager = {
+    init: function() {
+        this.injectLoaderHTML();
+        this.injectCSS();
+    },
+
+    injectLoaderHTML: function() {
+        const loaderHTML = `
+            <div id="tmLoader" class="loader" style="display: none; position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); z-index: 10000;"></div>
+        `;
+        document.body.insertAdjacentHTML('beforeend', loaderHTML);
+    },
+
+    injectCSS: function() {
+        const css = `
+.loader {
+        height: 5px;
+        width: 5px;
+        color: #3498db;
+        box-shadow: -10px -10px 0 5px,
+                    -10px -10px 0 5px,
+                    -10px -10px 0 5px,
+                    -10px -10px 0 5px;
+        animation: loader-38 6s infinite;
+      }
+
+      @keyframes loader-38 {
+        0% {
+          box-shadow: -10px -10px 0 5px,
+                      -10px -10px 0 5px,
+                      -10px -10px 0 5px,
+                      -10px -10px 0 5px;
+        }
+        8.33% {
+          box-shadow: -10px -10px 0 5px,
+                      10px -10px 0 5px,
+                      10px -10px 0 5px,
+                      10px -10px 0 5px;
+        }
+        16.66% {
+          box-shadow: -10px -10px 0 5px,
+                      10px -10px 0 5px,
+                      10px 10px 0 5px,
+                      10px 10px 0 5px;
+        }
+        24.99% {
+          box-shadow: -10px -10px 0 5px,
+                      10px -10px 0 5px,
+                      10px 10px 0 5px,
+                      -10px 10px 0 5px;
+        }
+        33.32% {
+          box-shadow: -10px -10px 0 5px,
+                      10px -10px 0 5px,
+                      10px 10px 0 5px,
+                      -10px -10px 0 5px;
+        }
+        41.65% {
+          box-shadow: 10px -10px 0 5px,
+                      10px -10px 0 5px,
+                      10px 10px 0 5px,
+                      10px -10px 0 5px;
+        }
+        49.98% {
+          box-shadow: 10px 10px 0 5px,
+                    10px 10px 0 5px,
+                    10px 10px 0 5px,
+                    10px 10px 0 5px;
+        }
+        58.31% {
+          box-shadow: -10px 10px 0 5px,
+                      -10px 10px 0 5px,
+                      10px 10px 0 5px,
+                      -10px 10px 0 5px;
+        }
+        66.64% {
+          box-shadow: -10px -10px 0 5px,
+                      -10px -10px 0 5px,
+                      10px 10px 0 5px,
+                      -10px 10px 0 5px;
+        }
+        74.97% {
+          box-shadow: -10px -10px 0 5px,
+                      10px -10px 0 5px,
+                      10px 10px 0 5px,
+                      -10px 10px 0 5px;
+        }
+        83.3% {
+          box-shadow: -10px -10px 0 5px,
+                      10px 10px 0 5px,
+                      10px 10px 0 5px,
+                      -10px 10px 0 5px;
+        }
+        91.63% {
+          box-shadow: -10px -10px 0 5px,
+                      -10px 10px 0 5px,
+                      -10px 10px 0 5px,
+                      -10px 10px 0 5px;
+        }
+        100% {
+          box-shadow: -10px -10px 0 5px,
+                      -10px -10px 0 5px,
+                      -10px -10px 0 5px,
+                      -10px -10px 0 5px;
+        }
+      }
+
+
+  }
+}
+            }
+        `;
+        const styleSheet = document.createElement("style");
+        styleSheet.type = "text/css";
+        styleSheet.innerText = css;
+        document.head.appendChild(styleSheet);
+    },
+
+    show: function() {
+        const loader = document.getElementById('tmLoader');
+        if (loader) loader.style.display = 'block';
+    },
+
+    hide: function() {
+        const loader = document.getElementById('tmLoader');
+        if (loader) loader.style.display = 'none';
+    }
+};
+
+function createLoading(){
+    window.LoaderManager.show()
+}
+
+// Initialize loader
+LoaderManager.init();
+
+// Attach LoaderManager to the window object to make it globally accessible
+window.LoaderManager = LoaderManager;
+
 
 // Function to extract EANs and quantities
 function fetchEANsAndQuantities() {
@@ -266,6 +408,7 @@ function setupCustomButtons() {
 
 // Handler for the 'Estimer prix Colisweb' button click
 async function EstimerButtonAction() {
+    createLoading();
     estimateButton.textContent = 'Calcul en cours...';
     const data = fetchEANsAndQuantities();
     const { address, postalCode } = fetchClientAddress();
@@ -638,6 +781,7 @@ async function fetchDeliveryOptions(geocodeData, packageMetrics, postalCode, glo
         if (!responseJson.calendar) {
             console.log("cockblocked");
             return "Unauthorized"
+            LoaderManager.hide();
             notification("Veuillez vous reconnecter à Coliweb");
         } else if (responseJson.calendar && responseJson.calendar.length > 0) {
             const priceWithTaxes = responseJson.calendar[0].priceWithTaxes;
@@ -645,6 +789,7 @@ async function fetchDeliveryOptions(geocodeData, packageMetrics, postalCode, glo
             const adjustedPrice = priceWithTaxes * 1.0376;
             const roundedPrice = parseFloat(adjustedPrice.toFixed(2));
             console.log("Prix Coliweb + marge:", adjustedPrice);
+            LoaderManager.hide();
             notification("", "Prix livraison: " + roundedPrice + " €");
             return priceWithTaxes;
         } else {
@@ -654,6 +799,7 @@ async function fetchDeliveryOptions(geocodeData, packageMetrics, postalCode, glo
         }
     } catch (error) {
         console.error("Error fetching delivery options:", error);
+        LoaderManager.hide();
         alert("Error fetching delivery options: " + error.message);
         return null; // Or return a specific error indicator
     }
@@ -669,7 +815,6 @@ function notification(type, message, linkText,linkURL) {
     notification.style.position = "fixed";
     notification.style.top = "50%";
     notification.style.left = "50%";
-    //notification.style.transform = "translate(-50%, -50%)";
     notification.style.backgroundColor = "#af4c4c";
     notification.style.color = "white";
     notification.style.padding = "15px 30px";
@@ -868,14 +1013,17 @@ async function onLivraisonButtonPress(eans, geocodeData, postalCode, firstName, 
 
         } else {
             console.error("Failed to fetch delivery options after several attempts.")
+            LoaderManager.hide();
             notification("alert", "Veuillez vous reconnecter à Colisweb", "Cliquez ici", "https://bo.production.colisweb.com/login");
             estimateButton.textContent = 'Estimer prix Colisweb';
         }
 
     } catch (error) {
         console.error("An error occurred:", error);
+        LoaderManager.hide();
         notification("alert", error);
         estimateButton.textContent = 'Estimer prix Colisweb';
+
     }
 }
 
