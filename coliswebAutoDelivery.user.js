@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Coliweb Livraison Calculator
 // @namespace    cstrm.scripts/colisweb1
-// @version      1.8
+// @version      1.9
 // @description  Fetch and log package specifications
 // @author       Arnaud D.
 // @match        https://prod-agent.castorama.fr/*
@@ -179,6 +179,7 @@ async function fetchGeocodeData(address) {
 
 // Déclaration de la variable du buton "programmer la livraison" pour le rendre accessible à onLivraisonButtonPress()
 let deliveryButton;
+let estimateButton;
 // Utility function for creating and styling buttons
 function createButton({ id, textContent, styles, onClick }) {
     const button = document.createElement('button');
@@ -259,7 +260,7 @@ function setupCustomButtons() {
 
 // Handler for the 'Estimer prix Colisweb' button click
 async function EstimerButtonAction() {
-    estimateButton.textContent: 'Calcul en cours...',
+    estimateButton.textContent == 'Calcul en cours...';
     const data = fetchEANsAndQuantities();
     const { address, postalCode } = fetchClientAddress();
     console.log("Fetched Postal Code:", postalCode);
@@ -856,19 +857,19 @@ async function onLivraisonButtonPress(eans, geocodeData, postalCode, firstName, 
                 deliveryButton.style.display = 'inline-block'; // Correctly reference and manipulate the global button
             }
             if (estimateButton) {
-                estimateButton.textContent: 'Calcul en cours...'
+                estimateButton.textContent == 'Calcul en cours...';
             }
 
         } else {
             console.error("Failed to fetch delivery options after several attempts.")
             notification("alert", "Veuillez vous reconnecter à Colisweb", "Cliquez ici", "https://bo.production.colisweb.com/login");
-            estimateButton.textContent: 'Calcul en cours...'
+            estimateButton.textContent == 'Calcul en cours...';
         }
 
     } catch (error) {
         console.error("An error occurred:", error);
         notification("alert", error);
-        estimateButton.textContent: 'Calcul en cours...'
+        estimateButton.textContent == 'Calcul en cours...';
     }
 }
 
