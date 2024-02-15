@@ -1,6 +1,6 @@
 // ==UserScript==
 // @name         Coliweb Livraison Calculator
-// @namespace    castorama.scripts/colisweb1
+// @namespace    cstrm.scripts/colisweb1
 // @version      1.6
 // @description  Fetch and log package specifications
 // @author       Arnaud D.
@@ -259,6 +259,7 @@ function setupCustomButtons() {
 
 // Handler for the 'Estimer prix Colisweb' button click
 async function EstimerButtonAction() {
+    estimateButton.textContent: 'Calcul en cours...',
     const data = fetchEANsAndQuantities();
     const { address, postalCode } = fetchClientAddress();
     console.log("Fetched Postal Code:", postalCode);
@@ -843,9 +844,9 @@ async function onLivraisonButtonPress(eans, geocodeData, postalCode, firstName, 
                 address: fetchClientAddress().address || "Info manquante",
                 packageMetrics: packageMetrics || "Info manquante",
                 postalCode: postalCode || "Info manquante",
-                firstName: firstName || "Info manquante",
-                name: name || "Info manquante",
-                phone: phone || "Info manquante",
+                firstName: firstName || "Coming soon...",
+                name: name || "Coming soon...",
+                phone: phone || "Coming soon...",
             };
 
             // Function to clear all stored data before adding new data
@@ -854,15 +855,20 @@ async function onLivraisonButtonPress(eans, geocodeData, postalCode, firstName, 
             if (deliveryButton) {
                 deliveryButton.style.display = 'inline-block'; // Correctly reference and manipulate the global button
             }
+            if (estimateButton) {
+                estimateButton.textContent: 'Calcul en cours...'
+            }
 
         } else {
             console.error("Failed to fetch delivery options after several attempts.")
             notification("alert", "Veuillez vous reconnecter à Colisweb", "Cliquez ici", "https://bo.production.colisweb.com/login");
+            estimateButton.textContent: 'Calcul en cours...'
         }
 
     } catch (error) {
         console.error("An error occurred:", error);
         notification("alert", error);
+        estimateButton.textContent: 'Calcul en cours...'
     }
 }
 
