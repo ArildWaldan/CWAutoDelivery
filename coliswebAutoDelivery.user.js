@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Coliweb Livraison Calculator
 // @namespace    cstrm.scripts/colisweb1
-// @version      1.14
+// @version      1.15
 // @downloadURL  https://github.com/ArildWaldan/CWAutoDelivery/raw/main/coliswebAutoDelivery.user.js
 // @updateURL    https://github.com/ArildWaldan/CWAutoDelivery/raw/main/coliswebAutoDelivery.user.js
 // @description  Fetch and log package specifications
@@ -236,38 +236,53 @@ function fetchClientAddress() {
 
 // Function to fetch the client's contact info
 function fetchClientInfos() {
-    var nameSelector = 'document.querySelector("#tabs-customer-details > div > div.primary-col > div.js-account-details-response > div:nth-child(1) > div.accord-content > div.col1.cust-del-add-col1 > dl > dd:nth-child(2)"))'; // Replace with the name selector
-    var phoneSelector = '#tabs-customer-details > div > div.primary-col > div.js-account-details-response > div.accord-wrapper.js-tpAccountContact > div.accord-content.panel-list > div:nth-child(1) > div.col2.cust-del-add-col2 > dls'; // Replace with the phone selector
+    var nameSelector = '.col1.cust-del-add-col1 dl.definition-desc-inline dd'; // Selector for the name
+    var phoneSelectorFixed = '.col2.cust-del-add-col2 dl.definition-desc-inline dd:nth-of-type(1)'; // Selector for the fixed phone number
+    var phoneSelectorMobile = '.col2.cust-del-add-col2 dl.definition-desc-inline dd:nth-of-type(2)'; // Selector for the mobile phone number
 
     var nameElement = document.querySelector(nameSelector);
-    var phoneElement = document.querySelector(phoneSelector);
+    var phoneElementFixed = document.querySelector(phoneSelectorFixed);
+    var phoneElementMobile = document.querySelector(phoneSelectorMobile);
 
-    let name = '';
+    let fullName = '';
     let firstName = '';
-    let phone = '';
+    let name = '';
+    let phoneFixed = '';
+    let phoneMobile = '';
 
     if (nameElement && nameElement.textContent.trim() !== '') {
-        // Logic to split the name and extract the phone
-        let fullName = nameElement.textContent.trim().replace(/^(Mr\.|Mme\.)\s*/, ''); // Remove title and trim
-        let nameParts = fullName.split(' '); // Split by space to separate first name from last name(s)
+        fullName = nameElement.textContent.trim().replace(/\s+/g, ' '); // Clean up and normalize whitespace
+        // Remove prefixes like "M.", "Mme", or "Mlle"
+        fullName = fullName.replace(/^(M\.|Mme|Mlle)\s*/, '');
 
-        firstName = nameParts.shift(); // The first element is the first name
-        name = nameParts.join(' '); // The rest is considered as the last name
-    }
-
-    if (phoneElement && phoneElement.textContent.trim() !== '') {
-        let phoneText = phoneElement.textContent.trim();
-        let matches = phoneText.match(/\d/g); // Extract all digits
-        if (matches && matches.length >= 10) {
-            phone = matches.join('').substring(0, 10); // Join and take the first 10 digits
+        // Split the full name assuming the first part is the last name and the rest is the first name
+        let nameParts = fullName.split(' ');
+        if (nameParts.length > 1) {
+            firstName = nameParts[0]; // The first part is the last name
+            name = nameParts.slice(1).join(' '); // The rest is the first name(s)
+        } else {
+            // If only one part, it's a special case, adjust as needed
+            firstName = fullName;
         }
     }
 
-    console.log("Name:", firstName, name);
-    console.log("Phone: ", phone);
+    if (phoneElementFixed && phoneElementFixed.textContent.trim() !== '') {
+        phoneFixed = phoneElementFixed.textContent.trim();
+    }
 
-    return {firstName, name, phone};
+    if (phoneElementMobile && phoneElementMobile.textContent.trim() !== '') {
+        phoneMobile = phoneElementMobile.textContent.trim();
+    }
+
+    console.log("First Name:", firstName);
+    console.log("Last Name:", name);
+    console.log("Fixed Phone: ", phoneFixed);
+    console.log("Mobile Phone: ", phoneMobile);
+    const phone = phoneMobile || phoneFixed;
+
+    return {firstName, name, phoneFixed, phoneMobile};
 }
+
 
 
 
@@ -413,7 +428,7 @@ async function EstimerButtonAction() {
     const data = fetchEANsAndQuantities();
     const { address, postalCode } = fetchClientAddress();
     console.log("Fetched Postal Code:", postalCode);
-    //const { firstName, name, phone } = fetchClientInfos();
+    const { firstName, name, phone } = fetchClientInfos();
 
     const geocodeData = await fetchGeocodeData(address);
     console.log("Geocode Data:", geocodeData);
@@ -932,6 +947,7 @@ async function execution1() {
     const response = await fetchProductCode("3663602942986");
     if (!response.includes("Copyright (C)")) {
         await setupCustomButtons();
+        console.log("SAV cookie mis en place correctement")
     } else console.error("Something went wrong with the initialisation of the cookie");
 }
 
