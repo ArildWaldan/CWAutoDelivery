@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Coliweb Livraison Calculator
 // @namespace    cstrm.scripts/colisweb1
-// @version      1.16
+// @version      1.12
 // @downloadURL  https://github.com/ArildWaldan/CWAutoDelivery/raw/main/coliswebAutoDelivery.user.js
 // @updateURL    https://github.com/ArildWaldan/CWAutoDelivery/raw/main/coliswebAutoDelivery.user.js
 // @description  Fetch and log package specifications
@@ -1013,9 +1013,9 @@ async function onLivraisonButtonPress(eans, geocodeData, postalCode, firstName, 
                 address: fetchClientAddress().address || "Info manquante",
                 packageMetrics: packageMetrics || "Info manquante",
                 postalCode: postalCode || "Info manquante",
-                firstName: firstName || "Coming soon...",
-                name: name || "Coming soon...",
-                phone: phone || "Coming soon...",
+                firstName: firstName || fetchClientInfos().firstName,
+                name: name || fetchClientInfos().name,
+                phone: phone || fetchClientInfos().phone,
             };
 
             // Function to clear all stored data before adding new data
