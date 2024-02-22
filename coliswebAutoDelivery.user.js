@@ -1,7 +1,7 @@
 // ==UserScript==
-// @name         Coliweb Livraison Calculator test
+// @name         Coliweb Livraison Calculator
 // @namespace    cstrm.scripts/colisweb1
-// @version      1.19
+// @version      1.20
 // @downloadURL  https://github.com/ArildWaldan/CWAutoDelivery/raw/main/coliswebAutoDelivery.user.js
 // @updateURL    https://github.com/ArildWaldan/CWAutoDelivery/raw/main/coliswebAutoDelivery.user.js
 // @description  Fetch and log package specifications
