@@ -1,5 +1,5 @@
 // ==UserScript==
-// @name         Coliweb Livraison Calculator
+// @name         Coliweb Livraison Calculator test
 // @namespace    cstrm.scripts/colisweb1
 // @version      1.19
 // @downloadURL  https://github.com/ArildWaldan/CWAutoDelivery/raw/main/coliswebAutoDelivery.user.js
@@ -218,6 +218,11 @@ function fetchClientAddress() {
         address = deliveryAddressElement.textContent.trim();
     } else if (billingAddressElement) {
         address = billingAddressElement.textContent.trim();
+    } else {
+        LoaderManager.hide();
+        notification("alert", "Verifiez les coordonnées client.");
+        estimateButton.textContent = 'Estimer prix Colisweb';
+        throw new Error("Verifiez coordonnées client");
     }
 
     // Cleaning and formatting the address
@@ -230,7 +235,16 @@ function fetchClientAddress() {
     console.log("Extracted Postal Code:", postalCode);
 
     // Return both address and postalCode
-    return { address, postalCode };
+    if (address && postalCode) {
+        return { address, postalCode };
+
+    } else {
+        LoaderManager.hide();
+        estimateButton.textContent = 'Estimer prix Colisweb';
+        notification("alert", "Verifiez les coordonnées client.");
+        throw new Error("Verifiez coordonnées client");
+
+    }
 }
 
 
@@ -305,6 +319,7 @@ async function fetchGeocodeData(address) {
                 return { latitude, longitude };
             }
         } catch (error) {
+            notification ("alert", "Erreur de géolocalisation" + error);
             console.error("Error fetching geocode data:", error);
         }
         return null;
@@ -336,7 +351,7 @@ async function fetchGeocodeData(address) {
 
     // If all attempts fail, return null and optionally notify the user
     console.log("No geocode data found for the address after multiple attempts");
-    notification("", "Problème avec l'adresse - géolocalisation impossible");
+    notification("alert", "Problème avec l'adresse - géolocalisation impossible");
     return null;
 }
 
@@ -435,7 +450,7 @@ async function EstimerButtonAction() {
     console.log("Geocode Data:", geocodeData);
 
     if (geocodeData && postalCode) {
-        await onLivraisonButtonPress(data.map(item => item.ean), geocodeData, postalCode,);
+        await onLivraisonButtonPress(data.map(item => item.ean), geocodeData, postalCode,firstName, name, phone, address); //eans, geocodeData, postalCode, firstName, name, phone, button)
     } else {
         console.log("Required data for calculating delivery options is missing.");
     }
@@ -789,16 +804,29 @@ async function fetchDeliveryOptions(geocodeData, packageMetrics, postalCode, glo
         "requiredSkills": ["sidewalkdelivery"]
     };
 
+
+    // RESPONSE PARSING
     try {
         const responseText = await makeCORSRequest(url, "POST", headers, JSON.stringify(payload));
         const responseJson = JSON.parse(responseText);
         console.log(responseText.substring(0, 50));
 
-        if (!responseJson.calendar) {
+        if (responseJson.code && responseJson.code.includes('EXPIRED')) {
+            LoaderManager.hide();
             console.log("cockblocked");
             return "Unauthorized"
+
+        } else if (responseJson.code && responseJson.code.includes('LOAD')) {
             LoaderManager.hide();
-            notification("Veuillez vous reconnecter à Coliweb");
+            notification("alert", "Aucune offre coliweb compatible pour cette commande, faites une demande de devis via ", "ce formulaire", "https://bo.production.colisweb.com/store/clients/249/stores/8481/quotation")
+            throw new Error("Pas de formules coliweb existantes");
+
+        } else if (responseJson.error && responseJson.error.includes('heavy')) {
+            LoaderManager.hide();
+            notification("alert", "Aucune offre coliweb compatible pour cette commande, faites une demande de devis via ", "ce formulaire", "https://bo.production.colisweb.com/store/clients/249/stores/8481/quotation")
+            throw new Error("Pas de formules coliweb existantes");
+
+
         } else if (responseJson.calendar && responseJson.calendar.length > 0) {
             const priceWithTaxes = responseJson.calendar[0].priceWithTaxes;
             console.log("Prix coliweb:", priceWithTaxes);
@@ -809,6 +837,7 @@ async function fetchDeliveryOptions(geocodeData, packageMetrics, postalCode, glo
             notification("", "Prix livraison: " + roundedPrice + " €");
             return priceWithTaxes;
         } else {
+            LoaderManager.hide();
             console.log("Calendar array is empty or undefined");
             alert("No price data available");
             return null;
@@ -816,7 +845,7 @@ async function fetchDeliveryOptions(geocodeData, packageMetrics, postalCode, glo
     } catch (error) {
         console.error("Error fetching delivery options:", error);
         LoaderManager.hide();
-        alert("Error fetching delivery options: " + error.message);
+        throw new Error ("error");
         return null; // Or return a specific error indicator
     }
 }
@@ -959,7 +988,7 @@ async function execution1() {
 // SCRIPT 1 : COM+
 // Execution :
 
-async function onLivraisonButtonPress(eans, geocodeData, postalCode, firstName, name, phone, button) {
+async function onLivraisonButtonPress(eans, geocodeData, postalCode, firstName, name, phone, address) {
 
     try {
         await initializeSession();
@@ -1010,7 +1039,7 @@ async function onLivraisonButtonPress(eans, geocodeData, postalCode, firstName, 
         if (response !== "Unauthorized") { //Colisweb API SUCCESS!
             // "success" scenario
             deliveryDetails = {
-                address: fetchClientAddress().address || "Info manquante",
+                address:  address || fetchClientAddress().address || "Info manquante",
                 packageMetrics: packageMetrics || "Info manquante",
                 postalCode: postalCode || "Info manquante",
                 firstName: firstName || fetchClientInfos().firstName,
@@ -1038,7 +1067,6 @@ async function onLivraisonButtonPress(eans, geocodeData, postalCode, firstName, 
     } catch (error) {
         console.error("An error occurred:", error);
         LoaderManager.hide();
-        notification("alert", error);
         estimateButton.textContent = 'Estimer prix Colisweb';
 
     }
