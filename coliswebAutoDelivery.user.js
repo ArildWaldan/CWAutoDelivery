@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Coliweb Livraison Calculator
 // @namespace    cstrm.scripts/colisweb1
-// @version      1.18
+// @version      1.22
 // @downloadURL  https://github.com/ArildWaldan/CWAutoDelivery/raw/main/coliswebAutoDelivery.user.js
 // @updateURL    https://github.com/ArildWaldan/CWAutoDelivery/raw/main/coliswebAutoDelivery.user.js
 // @description  Fetch and log package specifications
@@ -12,7 +12,6 @@
 // @connect      *
 // @match        https://prod-agent.castorama.fr/*
 // @match        https://bo.production.colisweb.com/*
-// @match        http://agile.intranet.castosav.castorama.fr:8080/*
 // @grant        GM_xmlhttpRequest
 // @grant        GM.getValue
 // @grant        GM.setValue
@@ -219,6 +218,11 @@ function fetchClientAddress() {
         address = deliveryAddressElement.textContent.trim();
     } else if (billingAddressElement) {
         address = billingAddressElement.textContent.trim();
+    } else {
+        LoaderManager.hide();
+        notification("alert", "Verifiez les coordonnées client.");
+        estimateButton.textContent = 'Estimer prix Colisweb';
+        throw new Error("Verifiez coordonnées client");
     }
 
     // Cleaning and formatting the address
@@ -231,7 +235,16 @@ function fetchClientAddress() {
     console.log("Extracted Postal Code:", postalCode);
 
     // Return both address and postalCode
-    return { address, postalCode };
+    if (address && postalCode) {
+        return { address, postalCode };
+
+    } else {
+        LoaderManager.hide();
+        estimateButton.textContent = 'Estimer prix Colisweb';
+        notification("alert", "Verifiez les coordonnées client.");
+        throw new Error("Verifiez coordonnées client");
+
+    }
 }
 
 
@@ -306,6 +319,7 @@ async function fetchGeocodeData(address) {
                 return { latitude, longitude };
             }
         } catch (error) {
+            notification ("alert", "Erreur de géolocalisation" + error);
             console.error("Error fetching geocode data:", error);
         }
         return null;
@@ -337,7 +351,7 @@ async function fetchGeocodeData(address) {
 
     // If all attempts fail, return null and optionally notify the user
     console.log("No geocode data found for the address after multiple attempts");
-    notification("", "Problème avec l'adresse - géolocalisation impossible");
+    notification("alert", "Problème avec l'adresse - géolocalisation impossible");
     return null;
 }
 
@@ -427,23 +441,16 @@ function setupCustomButtons() {
 async function EstimerButtonAction() {
     createLoading();
     estimateButton.textContent = 'Calcul en cours...';
-
     const data = fetchEANsAndQuantities();
     const { address, postalCode } = fetchClientAddress();
     console.log("Fetched Postal Code:", postalCode);
-    if (!address && postalCode) {
-        notification ("alert", "Verifiez les coordonnées du client.");
-        LoaderManager.hide();
-        throw new Error ("Verifiez coordonées client");
-
-    }
     const { firstName, name, phone } = fetchClientInfos();
 
     const geocodeData = await fetchGeocodeData(address);
     console.log("Geocode Data:", geocodeData);
 
     if (geocodeData && postalCode) {
-        await onLivraisonButtonPress(data.map(item => item.ean), geocodeData, postalCode,);
+        await onLivraisonButtonPress(data.map(item => item.ean), geocodeData, postalCode,firstName, name, phone, address); //eans, geocodeData, postalCode, firstName, name, phone, button)
     } else {
         console.log("Required data for calculating delivery options is missing.");
     }
@@ -524,7 +531,6 @@ async function fetchProductCode(barcode, savCookie) {
     const responseText = await makeCORSRequest(url, "POST", headers, payload);
     console.log(responseText.substring(0, 50));
 
-
     // Check for failure response
     let attemptCount = await GM.getValue('attemptCount') || 0;
     if (attemptCount < 2) {
@@ -553,7 +559,6 @@ async function fetchProductCode(barcode, savCookie) {
         await setupCustomButtons();
     }
 
-
     return extractProductCode(responseText);
 }
 
@@ -566,7 +571,7 @@ async function fetchPackageData(productId, cookie) {
         "Accept-Encoding": "gzip, deflate",
         "Accept-Language": "fr-FR,fr;q=0.9,en-US;q=0.8,en;q=0.7",
         "Content-type": "application/x-www-form-urlencoded; charset=UTF-8",
-        //"Cookie": cookie,
+        "Cookie": cookie,
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
         "X-Prototype-Version": "1.5.1.2",
         "X-Requested-With": "XMLHttpRequest"
@@ -716,14 +721,14 @@ function calculatePackageMetrics(fetchedData) {
     };
 }
 
-let globalCookie = ""; // Initialize a global variable to store the cookie
+let globalCookie = "session=eyJhbGciOiJIUzI1NiJ9.eyJpZCI6IjEwMjg1IiwidXNlcm5hbWUiOiJjYXN0b21ldHowMTIiLCJncm91cHMiOlsic3RvcmUtODQ4MSIsImNsaWVudC1wYXJlbnQtMjQ5Il0sInRyYW5zcG9ydGVySWQiOm51bGwsImNhcnJpZXJJZCI6bnVsbCwiY2xpZW50SWQiOiIyNDkiLCJzdG9yZUlkIjoiODQ4MSIsImZpYXQiOjE3MDg2Nzg1MzQsImlhdCI6MTcwODY3ODUzNCwiZXhwIjoxNzA4NzE0NTM0LCJpc3MiOiIybFZ4QkdVUjdGc3puckhYOGNlTEtFVVNWSG5oRzR6RiJ9.eHb50uoyUIvJglJVRHOzEg-wJWBDtmDJ4RYCvH719rc; Domain=.production.colisweb.com; Path=/; HttpOnly"; // Initialize a global variable to store the cookie
 
-/* async function setColiswebCookie() {
+async function setColiswebCookie() {
     console.log("fonction setColiswebCookie lancée");
     const url = "https://api.production.colisweb.com/api/v6/authent/external/session";
-    const headers = { */
- //       "Accept": "application/json, text/plain, */*",
-/*          "Content-Type": "application/json",
+    const headers = {
+        "Accept": "application/json, text/plain, */*",
+        "Content-Type": "application/json",
         "Accept-Encoding": "gzip, deflate",
         "Accept-Language": "fr-FR,fr;q=0.9,en-US;q=0.8,en;q=0.7",
         "Connection": "keep-alive",
@@ -733,7 +738,12 @@ let globalCookie = ""; // Initialize a global variable to store the cookie
         "X-Requested-With": "XMLHttpRequest",
         "Cookie": globalCookie,
     };
-    const payload = {"username":"id","password":"pw"} //changer avec vrai valeurs
+    const payload = {
+            password: atob(logID),
+            username: atob(logPW),
+        }
+
+    console.log("recunstituted payload: ", payload);
 
     try {
         const response = await makeCORSRequest(url, "PUT", headers, JSON.stringify(payload));
@@ -750,8 +760,6 @@ let globalCookie = ""; // Initialize a global variable to store the cookie
         console.error("Error setting new Colisweb cookie:", error);
     }
 }
- */
-
 
 // Function to fetch delivery options
 async function fetchDeliveryOptions(geocodeData, packageMetrics, postalCode, globalCookie) {
@@ -763,7 +771,7 @@ async function fetchDeliveryOptions(geocodeData, packageMetrics, postalCode, glo
     const headers = {
         "Content-Type": "application/json",
         //"Cookie": "_hjSessionUser_2541602=eyJpZCI6IjY2YWUzNWM3LTc1NzMtNWQ4ZS04YjI1LTUzMGYxMWY3OWRmZSIsImNyZWF0ZWQiOjE2Nzg5NjA2MDE1NjUsImV4aXN0aW5nIjp0cnVlfQ==; session=eyJhbGciOiJIUzI1NiJ9.eyJpZCI6IjEwMjg1IiwidXNlcm5hbWUiOiJjYXN0b21ldHowMTIiLCJncm91cHMiOlsic3RvcmUtODQ4MSIsImNsaWVudC1wYXJlbnQtMjQ5Il0sInRyYW5zcG9ydGVySWQiOm51bGwsImNhcnJpZXJJZCI6bnVsbCwiY2xpZW50SWQiOiIyNDkiLCJzdG9yZUlkIjoiODQ4MSIsImZpYXQiOjE3MDY3Nzc5MjIsImlhdCI6MTcwNjc3ODUxNCwiZXhwIjoxNzA2ODE0NTE0LCJpc3MiOiIybFZ4QkdVUjdGc3puckhYOGNlTEtFVVNWSG5oRzR6RiJ9.sOQJqakuKV2P6gl7Ks18lHjhCVGRKB7ssLDxuJmsVoI"
-        //"Cookie": globalCookie
+        "Cookie": globalCookie
     };
 
     // Calculate dynamic dates
@@ -818,18 +826,25 @@ async function fetchDeliveryOptions(geocodeData, packageMetrics, postalCode, glo
         "requiredSkills": ["sidewalkdelivery"]
     };
 
+
+    // RESPONSE PARSING
     try {
         const responseText = await makeCORSRequest(url, "POST", headers, JSON.stringify(payload));
         const responseJson = JSON.parse(responseText);
         console.log(responseText.substring(0, 50));
 
         if (responseJson.code && responseJson.code.includes('EXPIRED')) {
+            LoaderManager.hide();
             console.log("cockblocked");
             return "Unauthorized"
-            LoaderManager.hide();
 
         } else if (responseJson.code && responseJson.code.includes('LOAD')) {
+            LoaderManager.hide();
+            notification("alert", "Aucune offre coliweb compatible pour cette commande, faites une demande de devis via ", "ce formulaire", "https://bo.production.colisweb.com/store/clients/249/stores/8481/quotation")
+            throw new Error("Pas de formules coliweb existantes");
 
+        } else if (responseJson.error && responseJson.error.includes('heavy')) {
+            LoaderManager.hide();
             notification("alert", "Aucune offre coliweb compatible pour cette commande, faites une demande de devis via ", "ce formulaire", "https://bo.production.colisweb.com/store/clients/249/stores/8481/quotation")
             throw new Error("Pas de formules coliweb existantes");
 
@@ -844,6 +859,7 @@ async function fetchDeliveryOptions(geocodeData, packageMetrics, postalCode, glo
             notification("", "Prix livraison: " + roundedPrice + " €");
             return priceWithTaxes;
         } else {
+            LoaderManager.hide();
             console.log("Calendar array is empty or undefined");
             alert("No price data available");
             return null;
@@ -851,14 +867,14 @@ async function fetchDeliveryOptions(geocodeData, packageMetrics, postalCode, glo
     } catch (error) {
         console.error("Error fetching delivery options:", error);
         LoaderManager.hide();
-        alert("Error fetching delivery options: " + error.message);
+        throw new Error ("error");
         return null; // Or return a specific error indicator
     }
 }
 
 
 // Custom notifications
-let CW_popupWindow = null;
+let CW_popupWindow = null
 function notification(type, message, linkText,linkURL) {
 
     const notification = document.createElement("div");
@@ -982,13 +998,9 @@ async function clearAndSetGMValues() {
 async function execution1() {
     const response = await fetchProductCode("3663602942986");
     if (!response.includes("Copyright (C)")) {
-        await GM.setValue('attemptCount', 0);
         await setupCustomButtons();
         console.log("SAV cookie mis en place correctement")
-    } else {
-        console.error("Something went wrong with the initialisation of the cookie");
-        notification("alert", "Problème d'initialisation du script");
-    }
+    } else console.error("Something went wrong with the initialisation of the cookie");
 }
 
 
@@ -998,7 +1010,7 @@ async function execution1() {
 // SCRIPT 1 : COM+
 // Execution :
 
-async function onLivraisonButtonPress(eans, geocodeData, postalCode, firstName, name, phone, button) {
+async function onLivraisonButtonPress(eans, geocodeData, postalCode, firstName, name, phone, address) {
 
     try {
         await initializeSession();
@@ -1049,7 +1061,7 @@ async function onLivraisonButtonPress(eans, geocodeData, postalCode, firstName, 
         if (response !== "Unauthorized") { //Colisweb API SUCCESS!
             // "success" scenario
             deliveryDetails = {
-                address: fetchClientAddress().address || "Info manquante",
+                address:  address || fetchClientAddress().address || "Info manquante",
                 packageMetrics: packageMetrics || "Info manquante",
                 postalCode: postalCode || "Info manquante",
                 firstName: firstName || fetchClientInfos().firstName,
@@ -1077,7 +1089,6 @@ async function onLivraisonButtonPress(eans, geocodeData, postalCode, firstName, 
     } catch (error) {
         console.error("An error occurred:", error);
         LoaderManager.hide();
-        notification("alert", error);
         estimateButton.textContent = 'Estimer prix Colisweb';
 
     }
@@ -1132,11 +1143,11 @@ function closePopup(keyword) {
             this.addEventListener('load', function() {
                 if (this.status === 200) {
                     console.log("Api request success");
-
+                    // Call your desired function here
                     CW_popupWindow = null;
                     SAV_popupWindow = null;
                     window.close();
-
+                    
                 }
             });
         }
@@ -1358,6 +1369,7 @@ async function execution3() {
 }
 
 
+
 // -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 // -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 
@@ -1369,9 +1381,16 @@ function execution4() {
 }
 
 
+
+
+
 // -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 // -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 // -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+
+
+
 
 
 
