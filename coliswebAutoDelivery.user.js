@@ -1,5 +1,5 @@
 // ==UserScript==
-// @name         Coliweb Livraison Calculator
+// @name         Coliweb Livraison Calculator new test
 // @namespace    cstrm.scripts/colisweb1
 // @version      1.20
 // @downloadURL  https://github.com/ArildWaldan/CWAutoDelivery/raw/main/coliswebAutoDelivery.user.js
@@ -704,7 +704,7 @@ function calculatePackageMetrics(fetchedData) {
     };
 }
 
-let CW_Cookie = "session=eyJhbGciOiJIUzI1NiJ9.eyJpZCI6IjEwMjg1IiwidXNlcm5hbWUiOiJjYXN0b21ldHowMTIiLCJncm91cHMiOlsic3RvcmUtODQ4MSIsImNsaWVudC1wYXJlbnQtMjQ5Il0sInRyYW5zcG9ydGVySWQiOm51bGwsImNhcnJpZXJJZCI6bnVsbCwiY2xpZW50SWQiOiIyNDkiLCJzdG9yZUlkIjoiODQ4MSIsImZpYXQiOjE3MDg2Nzg1MzQsImlhdCI6MTcwODY3ODUzNCwiZXhwIjoxNzA4NzE0NTM0LCJpc3MiOiIybFZ4QkdVUjdGc3puckhYOGNlTEtFVVNWSG5oRzR6RiJ9.eHb50uoyUIvJglJVRHOzEg-wJWBDtmDJ4RYCvH719rc; Domain=.production.colisweb.com; Path=/; HttpOnly"
+let CW_Cookie = "session=eyJhbGciOiJIUzI1NiJ9.eyJpZCI6IjEwMjg1IiwidXNlcm5hbWUiOiJjYXN0b21ldHowMTIiLCJncm91cHMiOlsic3RvcmUtODQ4MSIsImNsaWVudC1wYXJlbnQtMjQ5Il0sInRyYW5zcG9ydGVySWQiOm51bGwsImNhcnJpZXJJZCI6bnVsbCwiY2xpZW50SWQiOiIyNDkiLCJzdG9yZUlkIjoiODQ4MSIsImZpYXQiOjE3MDg2ODU1NjYsImlhdCI6MTcwODY4NTU2NiwiZXhwIjoxNzA4NzIxNTY2LCJpc3MiOiIybFZ4QkdVUjdGc3puckhYOGNlTEtFVVNWSG5oRzR6RiJ9.NArnUnTTmNvgmDDMtJenzQbmEoR4M33chc8yloQYABM; Domain=.production.colisweb.com; Path=/; HttpOnly"
 
 async function setColiswebCookie() {
 
@@ -825,6 +825,12 @@ async function fetchDeliveryOptions(geocodeData, packageMetrics, postalCode) {
             LoaderManager.hide();
             console.log("cockblocked");
             return "Unauthorized"
+
+        } else if (responseJson.exp && responseJson.exp.includes('expired')) {
+            LoaderManager.hide();
+            console.log("cockblocked");
+            return "Unauthorized";
+
 
         } else if (responseJson.code && responseJson.code.includes('LOAD')) {
             LoaderManager.hide();
