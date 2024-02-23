@@ -1,7 +1,7 @@
 // ==UserScript==
-// @name         Coliweb Livraison Calculator
+// @name         Coliweb Livraison Calculator gergergerg
 // @namespace    cstrm.scripts/colisweb1
-// @version      1.20
+// @version      1.22
 // @downloadURL  https://github.com/ArildWaldan/CWAutoDelivery/raw/main/coliswebAutoDelivery.user.js
 // @updateURL    https://github.com/ArildWaldan/CWAutoDelivery/raw/main/coliswebAutoDelivery.user.js
 // @description  Fetch and log package specifications
@@ -513,7 +513,7 @@ async function initializeSession(savCookie) {
 }
 
 
-
+let SAV_popupWindow = null;
 // Function to fetch product ID by barcode
 async function fetchProductCode(barcode, savCookie) {
     const url = "http://agile.intranet.castosav.castorama.fr:8080/castoSav/main/validRechercheProduit.do";
@@ -522,7 +522,7 @@ async function fetchProductCode(barcode, savCookie) {
         "Accept-Encoding": "gzip, deflate",
         "Accept-Language": "fr-FR,fr;q=0.9,en-US;q=0.8,en;q=0.7",
         "Content-type": "application/x-www-form-urlencoded; charset=UTF-8",
-        "Cookie": savCookie,
+        //"Cookie": savCookie,
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
         "X-Prototype-Version": "1.5.1.2",
         "X-Requested-With": "XMLHttpRequest"
@@ -531,15 +531,32 @@ async function fetchProductCode(barcode, savCookie) {
     const responseText = await makeCORSRequest(url, "POST", headers, payload);
     console.log(responseText.substring(0, 50));
 
-     // Check for failure response
-    if (responseText.includes("Copyright (C)")) {
-        console.log("Detected failure response, updating SAV cookie...");
-        await setSavCookie();
-        console.log("setSAVcookie1 finished")
-        await setSavCookie();
-        //notification("alert", "un moment s'il vous plaît...");
-        //await delay(2000);
-        window.location.reload()
+    // Check for failure response
+    let attemptCount = await GM.getValue('attemptCount') || 0;
+    if (attemptCount < 2) {
+
+        if (responseText.includes("Copyright (C)")) {
+            console.log("Detected cookie failure response, updating SAV cookie...");
+
+            await setSavCookie();
+            console.log("setSAVcookie1 finished");
+
+            attemptCount++;
+            await GM.setValue('attemptCount', attemptCount);
+
+            await delay(500);
+            window.location.reload()
+        }
+
+
+    } else {
+        console.error('Maximum attempts to set the cookie exceeded');
+        await GM.setValue('attemptCount', 0);
+
+        //Logic pop up sav
+        SAV_popupWindow = window.open("http://agile.intranet.castosav.castorama.fr:8080/castoSav", "SAV_popupWindow", "width=100,height=100,scrollbars=no");
+        await delay(1000);
+        await setupCustomButtons();
     }
 
     return extractProductCode(responseText);
@@ -704,7 +721,7 @@ function calculatePackageMetrics(fetchedData) {
     };
 }
 
-let globalCookie = ""; // Initialize a global variable to store the cookie
+let globalCookie = "session=eyJhbGciOiJIUzI1NiJ9.eyJpZCI6IjEwMjg1IiwidXNlcm5hbWUiOiJjYXN0b21ldHowMTIiLCJncm91cHMiOlsic3RvcmUtODQ4MSIsImNsaWVudC1wYXJlbnQtMjQ5Il0sInRyYW5zcG9ydGVySWQiOm51bGwsImNhcnJpZXJJZCI6bnVsbCwiY2xpZW50SWQiOiIyNDkiLCJzdG9yZUlkIjoiODQ4MSIsImZpYXQiOjE3MDg2Nzg1MzQsImlhdCI6MTcwODY3ODUzNCwiZXhwIjoxNzA4NzE0NTM0LCJpc3MiOiIybFZ4QkdVUjdGc3puckhYOGNlTEtFVVNWSG5oRzR6RiJ9.eHb50uoyUIvJglJVRHOzEg-wJWBDtmDJ4RYCvH719rc; Domain=.production.colisweb.com; Path=/; HttpOnly"; // Initialize a global variable to store the cookie
 
 async function setColiswebCookie() {
     console.log("fonction setColiswebCookie lancée");
@@ -721,7 +738,12 @@ async function setColiswebCookie() {
         "X-Requested-With": "XMLHttpRequest",
         "Cookie": globalCookie,
     };
-    const payload = {"username":"castometz012","password":"cw12"}
+    const payload = {
+            password: atob(logID),
+            username: atob(logPW),
+        }
+
+    console.log("recunstituted payload: ", payload);
 
     try {
         const response = await makeCORSRequest(url, "PUT", headers, JSON.stringify(payload));
@@ -852,7 +874,7 @@ async function fetchDeliveryOptions(geocodeData, packageMetrics, postalCode, glo
 
 
 // Custom notifications
-let popupWindow = null;
+let CW_popupWindow = null
 function notification(type, message, linkText,linkURL) {
 
     const notification = document.createElement("div");
@@ -907,7 +929,7 @@ function notification(type, message, linkText,linkURL) {
         // Event listener to open link in a popup window
         hyperlink.addEventListener("click", function(event) {
             event.preventDefault(); // Prevent the default anchor action
-            popupWindow = window.open(linkURL, "popupWindow", "width=400,height=400,scrollbars=no");
+            CW_popupWindow = window.open(linkURL, "CW_popupWindow", "width=400,height=400,scrollbars=no");
         });
 
         // Append the hyperlink to the notification
@@ -1110,20 +1132,22 @@ async function autoFill(selector, value) {
 
 
 //Fonction pour détecter l'API
-function closePopup() {
+function closePopup(keyword) {
     // Save the original open and send functions of XMLHttpRequest
     var originalOpen = XMLHttpRequest.prototype.open;
     var originalSend = XMLHttpRequest.prototype.send;
 
     XMLHttpRequest.prototype.open = function(method, url) {
         // If the request URL is the one we're interested in, modify the send function
-        if (url.includes('external')) {
+        if (url.includes(keyword)) {
             this.addEventListener('load', function() {
                 if (this.status === 200) {
                     console.log("Api request success");
                     // Call your desired function here
+                    CW_popupWindow = null;
+                    SAV_popupWindow = null;
                     window.close();
-                    popupWindow = null;
+
                 }
             });
         }
@@ -1153,7 +1177,7 @@ async function execution2() {
     console.log("execution script 2 (login)");
     autoFill("#username", atob(logID));
     autoFill("#Password", atob(logPW));
-    closePopup();
+    closePopup('external');
 }
 
 
@@ -1348,7 +1372,25 @@ async function execution3() {
 
 // -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 // -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+// POP UP Casto SAV
+
+function execution4() {
+    //Close pop-up after successfull request to SAV API
+    closePopup("initAccueil.do");
+}
+
+
+
+
+
 // -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+// -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+// -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+
+
+
 
 
 
@@ -1365,5 +1407,7 @@ async function execution3() {
         await execution2();
     } else if (path.includes("create-delivery")) { // Colisweb
         await execution3();
+    } else if (path.includes("castoSav")) { // SAV
+        await execution4();
     }
 })();
