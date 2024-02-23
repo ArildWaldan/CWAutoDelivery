@@ -704,9 +704,14 @@ function calculatePackageMetrics(fetchedData) {
     };
 }
 
-let globalCookie = ""; // Initialize a global variable to store the cookie
+let CW_Cookie = "session=eyJhbGciOiJIUzI1NiJ9.eyJpZCI6IjEwMjg1IiwidXNlcm5hbWUiOiJjYXN0b21ldHowMTIiLCJncm91cHMiOlsic3RvcmUtODQ4MSIsImNsaWVudC1wYXJlbnQtMjQ5Il0sInRyYW5zcG9ydGVySWQiOm51bGwsImNhcnJpZXJJZCI6bnVsbCwiY2xpZW50SWQiOiIyNDkiLCJzdG9yZUlkIjoiODQ4MSIsImZpYXQiOjE3MDg2Nzg1MzQsImlhdCI6MTcwODY3ODUzNCwiZXhwIjoxNzA4NzE0NTM0LCJpc3MiOiIybFZ4QkdVUjdGc3puckhYOGNlTEtFVVNWSG5oRzR6RiJ9.eHb50uoyUIvJglJVRHOzEg-wJWBDtmDJ4RYCvH719rc; Domain=.production.colisweb.com; Path=/; HttpOnly"
 
 async function setColiswebCookie() {
+
+
+    const logID = "Y2FzdG9tZXR6MDEy";
+    const logPW = "Y3cxMg==";
+
     console.log("fonction setColiswebCookie lancée");
     const url = "https://api.production.colisweb.com/api/v6/authent/external/session";
     const headers = {
@@ -719,9 +724,14 @@ async function setColiswebCookie() {
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36",
         "X-Prototype-Version": "1.5.1.2",
         "X-Requested-With": "XMLHttpRequest",
-        "Cookie": globalCookie,
+        "Cookie": CW_Cookie,
     };
-    const payload = {"username":"castometz012","password":"cw12"}
+
+    const payload = {
+            password: atob(logID),
+            username: atob(logPW),
+        }
+
 
     try {
         const response = await makeCORSRequest(url, "PUT", headers, JSON.stringify(payload));
@@ -729,8 +739,8 @@ async function setColiswebCookie() {
         // Extract the "Set-Cookie" header from the response and update the global cookie
         const newCookie = response.headers['Set-Cookie'];
         if (newCookie) {
-            globalCookie = newCookie; // Update the global cookie with the new value
-            console.log("Colisweb Cookie updated successfully :", globalCookie );
+            CW_Cookie = newCookie; // Update the global cookie with the new value
+            console.log("Colisweb Cookie updated successfully :", CW_Cookie );
         } else {
             console.error("Failed to update Colisweb cookie: Set-Cookie header missing");
         }
@@ -740,7 +750,7 @@ async function setColiswebCookie() {
 }
 
 // Function to fetch delivery options
-async function fetchDeliveryOptions(geocodeData, packageMetrics, postalCode, globalCookie) {
+async function fetchDeliveryOptions(geocodeData, packageMetrics, postalCode) {
 
 
     console.log("Fetching delivery options with geocode data and package metrics");
@@ -749,7 +759,7 @@ async function fetchDeliveryOptions(geocodeData, packageMetrics, postalCode, glo
     const headers = {
         "Content-Type": "application/json",
         //"Cookie": "_hjSessionUser_2541602=eyJpZCI6IjY2YWUzNWM3LTc1NzMtNWQ4ZS04YjI1LTUzMGYxMWY3OWRmZSIsImNyZWF0ZWQiOjE2Nzg5NjA2MDE1NjUsImV4aXN0aW5nIjp0cnVlfQ==; session=eyJhbGciOiJIUzI1NiJ9.eyJpZCI6IjEwMjg1IiwidXNlcm5hbWUiOiJjYXN0b21ldHowMTIiLCJncm91cHMiOlsic3RvcmUtODQ4MSIsImNsaWVudC1wYXJlbnQtMjQ5Il0sInRyYW5zcG9ydGVySWQiOm51bGwsImNhcnJpZXJJZCI6bnVsbCwiY2xpZW50SWQiOiIyNDkiLCJzdG9yZUlkIjoiODQ4MSIsImZpYXQiOjE3MDY3Nzc5MjIsImlhdCI6MTcwNjc3ODUxNCwiZXhwIjoxNzA2ODE0NTE0LCJpc3MiOiIybFZ4QkdVUjdGc3puckhYOGNlTEtFVVNWSG5oRzR6RiJ9.sOQJqakuKV2P6gl7Ks18lHjhCVGRKB7ssLDxuJmsVoI"
-        "Cookie": globalCookie
+        "Cookie": CW_Cookie
     };
 
     // Calculate dynamic dates
@@ -1017,27 +1027,28 @@ async function onLivraisonButtonPress(eans, geocodeData, postalCode, firstName, 
         const maxRetries = 2;
         let currentAttempt = 0;
         let response;
-        response = await fetchDeliveryOptions(geocodeData, packageMetrics, postalCode, globalCookie);
-        /*
+    //    response = await fetchDeliveryOptions(geocodeData, packageMetrics, postalCode);
+
         //Logique pour set le colisweb Cookie et retry (non nécessaire en cas de login manuel):
         do {
-                response = await fetchDeliveryOptions(geocodeData, packageMetrics, postalCode, globalCookie);
+                response = await fetchDeliveryOptions(geocodeData, packageMetrics, postalCode);
                 if (response === "Unauthorized" && currentAttempt < maxRetries) {
                     console.log("Fetching delivery options failed, attempting to update cookie...");
                     await setColiswebCookie(); // Attempt to set a new cookie
                     currentAttempt++;
-                    await new Promise(resolve => setTimeout(resolve, 1000)); // 1-second delay
+                    await new Promise(resolve => setTimeout(resolve, 2000)); // 1-second delay
 
                 } else {
                     break; // Exit loop if response is not "Unauthorized" or max retries reached
                 }
             } while (currentAttempt < maxRetries);
- */
+
         // Handle response after exiting the loop
 
 
         if (response !== "Unauthorized") { //Colisweb API SUCCESS!
             // "success" scenario
+            console.log("Colisweb API success !");
             deliveryDetails = {
                 address:  address || fetchClientAddress().address || "Info manquante",
                 packageMetrics: packageMetrics || "Info manquante",
