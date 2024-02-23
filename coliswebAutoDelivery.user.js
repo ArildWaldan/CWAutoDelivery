@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Coliweb Livraison Calculator
 // @namespace    cstrm.scripts/colisweb1
-// @version      1.24
+// @version      1.25
 // @downloadURL  https://github.com/ArildWaldan/CWAutoDelivery/raw/main/coliswebAutoDelivery.user.js
 // @updateURL    https://github.com/ArildWaldan/CWAutoDelivery/raw/main/coliswebAutoDelivery.user.js
 // @description  Fetch and log package specifications
@@ -10,6 +10,7 @@
 // @connect      http://agile.intranet.castosav.castorama.fr:8080/*
 // @connect      https://api.production.colisweb.com
 // @connect      *
+// @match        http://agile.intranet.castosav.castorama.fr:8080/*
 // @match        https://prod-agent.castorama.fr/*
 // @match        https://bo.production.colisweb.com/*
 // @grant        GM_xmlhttpRequest
@@ -533,6 +534,7 @@ async function fetchProductCode(barcode, savCookie) {
 
     // Check for failure response
     let attemptCount = await GM.getValue('attemptCount') || 0;
+    console.log("Nombre de tentatives tentées: 0", attemptCount);
     if (attemptCount < 2) {
 
         if (responseText.includes("Copyright (C)")) {
@@ -542,9 +544,10 @@ async function fetchProductCode(barcode, savCookie) {
             console.log("setSAVcookie1 finished");
 
             attemptCount++;
+            console.log("Nombre de tentatives tentées: 0", attemptCount);
             await GM.setValue('attemptCount', attemptCount);
 
-            await delay(500);
+            await delay(2000);
             window.location.reload()
         }
 
@@ -555,6 +558,7 @@ async function fetchProductCode(barcode, savCookie) {
 
         //Logic pop up sav
         SAV_popupWindow = window.open("http://agile.intranet.castosav.castorama.fr:8080/castoSav", "SAV_popupWindow", "width=100,height=100,scrollbars=no");
+        console.log("opening SAV popup");
         await delay(1000);
         await setupCustomButtons();
     }
@@ -1375,8 +1379,9 @@ async function execution3() {
 
 // POP UP Casto SAV
 
-function execution4() {
+async function execution4() {
     //Close pop-up after successfull request to SAV API
+    await delay (0);
     closePopup("initAccueil.do");
 }
 
@@ -1407,7 +1412,7 @@ function execution4() {
         await execution2();
     } else if (path.includes("create-delivery")) { // Colisweb
         await execution3();
-    } else if (path.includes("castoSav")) { // SAV
+    } else if (domain.includes("agile.intranet.castosav.castorama.fr:8080/") && path.includes("castoSav") ) { // SAV
         await execution4();
     }
 })();
