@@ -1,5 +1,5 @@
 // ==UserScript==
-// @name         Coliweb Livraison Calculator
+// @name         Coliweb Livraison Calculator2
 // @namespace    cstrm.scripts/colisweb1
 // @version      1.25
 // @downloadURL  https://github.com/ArildWaldan/CWAutoDelivery/raw/main/coliswebAutoDelivery.user.js
@@ -11,7 +11,7 @@
 // @connect      https://api.production.colisweb.com
 // @connect      *
 // @match        http://agile.intranet.castosav.castorama.fr:8080/*
-// @match        https://prod-agent.castorama.fr/*
+// @match        https://*.castorama.fr/*
 // @match        https://bo.production.colisweb.com/*
 // @grant        GM_xmlhttpRequest
 // @grant        GM.getValue
@@ -344,7 +344,7 @@ async function fetchGeocodeData(address) {
         // This captures everything after the postal code, assumed to be the city
         const city = match[1].trim();
         const postalCode = match[0].trim().substring(0, 5); // Extracts the postal code
-         console.log("Requesting Geocode Data from URL:",`${city} ${postalCode}` );
+        console.log("Requesting Geocode Data from URL:",`${city} ${postalCode}` );
         await delay(1001);
         geoData = await attemptGeocode(`${city} ${postalCode}`);
         if (geoData) return geoData;
@@ -407,7 +407,7 @@ function setupCustomButtons() {
         onClick: EstimerButtonAction
     });
 
-     deliveryButton = createButton({
+    deliveryButton = createButton({
         id: 'programmer-la-livraison',
         textContent: 'Programmer la livraison',
         styles: { marginLeft: '38px', marginTop: '10px', display: 'none' },
@@ -431,7 +431,7 @@ function setupCustomButtons() {
         if (document.querySelector('.ui-row.col-80-20.basket .secondary-col') &&
             document.querySelector('.js-proceed-checkout-btn') &&
             !document.getElementById('Estimer-livraison')) {
-                attemptToAddButtons();
+            attemptToAddButtons();
         }
     });
 
@@ -725,33 +725,36 @@ function calculatePackageMetrics(fetchedData) {
     };
 }
 
-let globalCookie = "session=eyJhbGciOiJIUzI1NiJ9.eyJpZCI6IjEwMjg1IiwidXNlcm5hbWUiOiJjYXN0b21ldHowMTIiLCJncm91cHMiOlsic3RvcmUtODQ4MSIsImNsaWVudC1wYXJlbnQtMjQ5Il0sInRyYW5zcG9ydGVySWQiOm51bGwsImNhcnJpZXJJZCI6bnVsbCwiY2xpZW50SWQiOiIyNDkiLCJzdG9yZUlkIjoiODQ4MSIsImZpYXQiOjE3MDg2Nzg1MzQsImlhdCI6MTcwODY3ODUzNCwiZXhwIjoxNzA4NzE0NTM0LCJpc3MiOiIybFZ4QkdVUjdGc3puckhYOGNlTEtFVVNWSG5oRzR6RiJ9.eHb50uoyUIvJglJVRHOzEg-wJWBDtmDJ4RYCvH719rc; Domain=.production.colisweb.com; Path=/; HttpOnly"; // Initialize a global variable to store the cookie
+let globalCookie = ""; // Initialize a global variable to store the cookie
 
 async function setColiswebCookie() {
+
+    const logID = "Y2FzdG9tZXR6MDEy";
+    const logPW = "Y3cxMg==";
+
     console.log("fonction setColiswebCookie lancée");
     const url = "https://api.production.colisweb.com/api/v6/authent/external/session";
     const headers = {
         "Accept": "application/json, text/plain, */*",
         "Content-Type": "application/json",
-        "Accept-Encoding": "gzip, deflate",
         "Accept-Language": "fr-FR,fr;q=0.9,en-US;q=0.8,en;q=0.7",
         "Connection": "keep-alive",
-        "Content-Length": "94",
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36",
         "X-Prototype-Version": "1.5.1.2",
         "X-Requested-With": "XMLHttpRequest",
-        "Cookie": globalCookie,
+        "Cookie": globalCookie
+
+
     };
     const payload = {
-            password: atob(logID),
-            username: atob(logPW),
-        }
-
-    console.log("recunstituted payload: ", payload);
+        password: atob(logPW),
+        username: atob(logID),
+    }
 
     try {
-        const response = await makeCORSRequest(url, "PUT", headers, JSON.stringify(payload));
+        const response = await makeCORSRequest(url, "POST", headers, JSON.stringify(payload)); //POST !!!!
         console.log("making request for new cookie", response)
+        //Here I need to get hold of the cookie set by the response, and probably GM.setValue it, so it can be used as basis for next session creation.
         // Extract the "Set-Cookie" header from the response and update the global cookie
         const newCookie = response.headers['Set-Cookie'];
         if (newCookie) {
@@ -840,7 +843,12 @@ async function fetchDeliveryOptions(geocodeData, packageMetrics, postalCode, glo
         if (responseJson.code && responseJson.code.includes('EXPIRED')) {
             LoaderManager.hide();
             console.log("cockblocked");
-            return "Unauthorized"
+            return responseJson;
+
+        } else if (responseJson.exp?.includes("expired") || responseJson.message?.includes("Unauthorized")) {
+            LoaderManager.hide();
+            console.log("cockblocked : ", responseJson);
+            return responseJson;
 
         } else if (responseJson.code && responseJson.code.includes('LOAD')) {
             LoaderManager.hide();
@@ -918,7 +926,7 @@ function notification(type, message, linkText,linkURL) {
         notification.style.boxShadow = "0 10px 8px rgba(0,0,0,0.4)"
 
 
-        }, 10);
+    }, 10);
 
 
     // If linkText and linkURL are provided, create and append the hyperlink
@@ -948,7 +956,7 @@ function notification(type, message, linkText,linkURL) {
 
     }
 
-     setTimeout(() => {
+    setTimeout(() => {
         notification.style.opacity = '0'; // Initiate fade-out
     }, 5000);
 
@@ -1044,25 +1052,11 @@ async function onLivraisonButtonPress(eans, geocodeData, postalCode, firstName, 
         let currentAttempt = 0;
         let response;
         response = await fetchDeliveryOptions(geocodeData, packageMetrics, postalCode, globalCookie);
-        /*
-        //Logique pour set le colisweb Cookie et retry (non nécessaire en cas de login manuel):
-        do {
-                response = await fetchDeliveryOptions(geocodeData, packageMetrics, postalCode, globalCookie);
-                if (response === "Unauthorized" && currentAttempt < maxRetries) {
-                    console.log("Fetching delivery options failed, attempting to update cookie...");
-                    await setColiswebCookie(); // Attempt to set a new cookie
-                    currentAttempt++;
-                    await new Promise(resolve => setTimeout(resolve, 1000)); // 1-second delay
 
-                } else {
-                    break; // Exit loop if response is not "Unauthorized" or max retries reached
-                }
-            } while (currentAttempt < maxRetries);
- */
-        // Handle response after exiting the loop
-
-
-        if (response !== "Unauthorized") { //Colisweb API SUCCESS!
+        if (response.exp?.includes("expired") || response.message?.includes("Unauthorized")) {
+            await setColiswebCookie();
+            response = await fetchDeliveryOptions();
+        } else if (response) { //Colisweb API SUCCESS!
             // "success" scenario
             deliveryDetails = {
                 address:  address || fetchClientAddress().address || "Info manquante",
@@ -1083,6 +1077,7 @@ async function onLivraisonButtonPress(eans, geocodeData, postalCode, firstName, 
                 estimateButton.textContent = 'Estimer prix Colisweb';
             }
 
+
         } else {
             console.error("Failed to fetch delivery options after several attempts.")
             LoaderManager.hide();
@@ -1101,318 +1096,318 @@ async function onLivraisonButtonPress(eans, geocodeData, postalCode, firstName, 
 
 
 
-// -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
-// -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+    // -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+    // -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 
-// SCRIPT 2 (colsiweb log-in)
-// Functions :
+    // SCRIPT 2 (colsiweb log-in)
+    // Functions :
 
-function delay(ms) {
-    return new Promise(resolve => setTimeout(resolve, ms));
-}
-
-
-
-function isElementVisible(element) {
-    return element && element.offsetParent !== null && getComputedStyle(element).display !== 'none' && getComputedStyle(element).visibility !== 'hidden';
-}
-
-
-
-
-async function autoFill(selector, value) {
-    let inputField = document.querySelector(selector);
-
-    // Wait until the element is visible
-    do {
-        await delay(500);
-        inputField = document.querySelector(selector);
-    } while (!inputField || !isElementVisible(inputField));
-
-    console.log(`${selector} found and is visible. Setting placeholder.`);
-    inputField.setAttribute('placeholder', value);
-}
-
-
-
-//Fonction pour détecter l'API
-function closePopup(keyword) {
-    // Save the original open and send functions of XMLHttpRequest
-    var originalOpen = XMLHttpRequest.prototype.open;
-    var originalSend = XMLHttpRequest.prototype.send;
-
-    XMLHttpRequest.prototype.open = function(method, url) {
-        // If the request URL is the one we're interested in, modify the send function
-        if (url.includes(keyword)) {
-            this.addEventListener('load', function() {
-                if (this.status === 200) {
-                    console.log("Api request success");
-                    // Call your desired function here
-                    CW_popupWindow = null;
-                    SAV_popupWindow = null;
-                    window.close();
-
-                }
-            });
-        }
-        // Call the original open method
-        originalOpen.apply(this, arguments);
-    };
-
-    // The send method is left untouched; we just need to ensure it's defined after open
-    XMLHttpRequest.prototype.send = originalSend;
-
-
-}
-
-
-
-
-
-// ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
-// EXECUTION Script 2 (colisweb Login) :
-
-const logID = "Y2FzdG9tZXR6MDEy";
-const logPW = "Y3cxMg=="
-
-
-async function execution2() {
-
-    console.log("execution script 2 (login)");
-    autoFill("#username", atob(logID));
-    autoFill("#Password", atob(logPW));
-    closePopup('external');
-}
-
-
-
-
-
-
-// -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
-// -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
-
-// SCRIPT 3 : Colisweb Autfill
-// Functions
-
-// Function to retrieve and log the stored delivery details
-async function fetchDeliveryDetails() {
-    const storedDeliveryDetails = await GM.getValue("deliveryDetails", "{}");
-    console.log("Manually retrieved Data:", storedDeliveryDetails);
-    //let deliveryDetails;
-
-    try {
-        deliveryDetails = JSON.parse(storedDeliveryDetails);
-        console.log("Delivery details chopés:", deliveryDetails);
-        return deliveryDetails; // Return the parsed object
-    } catch(e) {
-        console.error("Error parsing delivery details:", e);
-        return {}; // Return an empty object in case of error
+    function delay(ms) {
+        return new Promise(resolve => setTimeout(resolve, ms));
     }
-}
 
 
 
-// Listvalues
-async function listvalues(){
-    const keys = await GM.listValues(); // Retrieve all keys
-    console.log("liste des clés retrouvées dans le script 2:", keys)
-}
+    function isElementVisible(element) {
+        return element && element.offsetParent !== null && getComputedStyle(element).display !== 'none' && getComputedStyle(element).visibility !== 'hidden';
+    }
 
 
 
 
-// Function to attempt to set the address value
-let addressInput = null;
+    async function autoFill(selector, value) {
+        let inputField = document.querySelector(selector);
 
-async function fillAddress() {
-    console.log("fillAddress lancée");
-    // Check if the deliveryDetails object contains the address
-    if (deliveryDetails.address) {
-        console.log("searching for input field...");
-        do{
-            addressInput = document.querySelector('[id^="headlessui-combobox-input-"]');
-            await delay(50);
-        }while (!addressInput);
-        if (addressInput) {
-            console.log("Address input field found");
-            addressInput.value = deliveryDetails.address;
-            // Trigger any required events after setting the value
-        } else {
-            console.error("Address input field not found");
+        // Wait until the element is visible
+        do {
+            await delay(500);
+            inputField = document.querySelector(selector);
+        } while (!inputField || !isElementVisible(inputField));
+
+        console.log(`${selector} found and is visible. Setting placeholder.`);
+        inputField.setAttribute('placeholder', value);
+    }
+
+
+
+    //Fonction pour détecter l'API
+    function closePopup(keyword) {
+        // Save the original open and send functions of XMLHttpRequest
+        var originalOpen = XMLHttpRequest.prototype.open;
+        var originalSend = XMLHttpRequest.prototype.send;
+
+        XMLHttpRequest.prototype.open = function(method, url) {
+            // If the request URL is the one we're interested in, modify the send function
+            if (url.includes(keyword)) {
+                this.addEventListener('load', function() {
+                    if (this.status === 200) {
+                        console.log("Api request success");
+                        // Call your desired function here
+                        CW_popupWindow = null;
+                        SAV_popupWindow = null;
+                        window.close();
+
+                    }
+                });
+            }
+            // Call the original open method
+            originalOpen.apply(this, arguments);
+        };
+
+        // The send method is left untouched; we just need to ensure it's defined after open
+        XMLHttpRequest.prototype.send = originalSend;
+
+
+    }
+
+
+
+
+
+    // ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+    // EXECUTION Script 2 (colisweb Login) :
+
+    const logID = "Y2FzdG9tZXR6MDEy";
+    const logPW = "Y3cxMg=="
+
+
+    async function execution2() {
+
+        console.log("execution script 2 (login)");
+        autoFill("#username", atob(logID));
+        autoFill("#Password", atob(logPW));
+        closePopup('external');
+    }
+
+
+
+
+
+
+    // -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+    // -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+    // SCRIPT 3 : Colisweb Autfill
+    // Functions
+
+    // Function to retrieve and log the stored delivery details
+    async function fetchDeliveryDetails() {
+        const storedDeliveryDetails = await GM.getValue("deliveryDetails", "{}");
+        console.log("Manually retrieved Data:", storedDeliveryDetails);
+        //let deliveryDetails;
+
+        try {
+            deliveryDetails = JSON.parse(storedDeliveryDetails);
+            console.log("Delivery details chopés:", deliveryDetails);
+            return deliveryDetails; // Return the parsed object
+        } catch(e) {
+            console.error("Error parsing delivery details:", e);
+            return {}; // Return an empty object in case of error
         }
     }
-}
 
 
 
-//Met place holder automatiquement
-async function autoPlaceHolder(selector, value) {
-    let inputField = document.querySelector(selector);
-
-    do {
-        await delay(500);
-        inputField = document.querySelector(selector);
-    } while (!inputField || !isElementVisible(inputField));
-
-    console.log(`${selector} found and is visible. Setting placeholder.`);
-    inputField.setAttribute('placeholder', value);
-}
-
-
-
-async function highlightBooleanHeight(value) {
-    let boolean = null
-    console.log("Valeur utilisée pour booléen : ", value);
-    let presenceBoolean = null;
-    do {
-        presenceBoolean = document.querySelector("#root > div > div:nth-child(2) > main > div > div > div:nth-child(2) > div.w-full.ml-8 > form > div > div:nth-child(2) > div.flex.mb-4 > div > label.flex.items-center.cursor-pointer.bg-neutral-100.border.border-neutral-100.p-1.rounded-lg.hover\\:border-primary-600.lessThan150");
-        await delay(200);
-    } while (!presenceBoolean);
-    console.log("booléen détecté");
-
-
-    if (value < 150){
-        console.log("condition -150 remplie");
-        boolean = document.querySelector("#root > div > div:nth-child(2) > main > div > div > div:nth-child(2) > div.w-full.ml-8 > form > div > div:nth-child(2) > div.flex.mb-4 > div > label.flex.items-center.cursor-pointer.bg-neutral-100.border.border-neutral-100.p-1.rounded-lg.hover\\:border-primary-600.lessThan150");
-        boolean.style.transition = "all 1s ease-in-out";
-        await delay(10);
-        boolean.style.backgroundColor = '#9fe8f2';
-
-    } else if (value >149 && value <181) {
-        console.log("condition 150<>180 remplie");
-        boolean = document.querySelector("#root > div > div:nth-child(2) > main > div > div > div:nth-child(2) > div.w-full.ml-8 > form > div > div:nth-child(2) > div.flex.mb-4 > div > label.flex.items-center.cursor-pointer.bg-neutral-100.border.border-neutral-100.p-1.rounded-lg.hover\\:border-primary-600.my-6.between150And180");
-        boolean.style.transition = "all 1s ease-in-out";
-        await delay(10);
-        boolean.style.backgroundColor = '#9fe8f2';
-
-    } else if (value >180) {
-        console.log("condition >180 remplie");
-        boolean = document.querySelector("#root > div > div:nth-child(2) > main > div > div > div:nth-child(2) > div.w-full.ml-8 > form > div > div:nth-child(2) > div.flex.mb-4 > div > label.flex.items-center.cursor-pointer.bg-neutral-100.border.border-neutral-100.p-1.rounded-lg.hover\\:border-primary-600.moreThan180");
-        boolean.style.transition = "all 1s ease-in-out";
-        await delay(10);
-        boolean.style.backgroundColor = '#9fe8f2';
+    // Listvalues
+    async function listvalues(){
+        const keys = await GM.listValues(); // Retrieve all keys
+        console.log("liste des clés retrouvées dans le script 2:", keys)
     }
 
 
-}
 
-async function highlightBooleanWidth(value) {
-    let boolean = null
-    console.log("Valeur utilisée pour booléen width: ", value);
-    let presenceBoolean = null;
-    do {
-        presenceBoolean = document.querySelector("#root > div > div:nth-child(2) > main > div > div > div:nth-child(2) > div.w-full.ml-8 > form > div > div:nth-child(2) > div.flex.mb-4 > div > label.flex.items-center.cursor-pointer.bg-neutral-100.border.border-neutral-100.p-1.rounded-lg.hover\\:border-primary-600.mb-6.lessThanOrEqualTo50");
-        await delay(200);
 
-    }while(!presenceBoolean);
-    console.log("booléen width détecté");
+    // Function to attempt to set the address value
+    let addressInput = null;
 
-    if (value < 51){
-        console.log("condition -50 remplie");
-        boolean = document.querySelector("#root > div > div:nth-child(2) > main > div > div > div:nth-child(2) > div.w-full.ml-8 > form > div > div:nth-child(2) > div.flex.mb-4 > div > label.flex.items-center.cursor-pointer.bg-neutral-100.border.border-neutral-100.p-1.rounded-lg.hover\\:border-primary-600.mb-6.lessThanOrEqualTo50");
-        boolean.style.transition = "all 1s ease-in-out";
-        await delay(10);
-        boolean.style.backgroundColor = '#9fe8f2';
-
-    }else if (value >50) {
-        console.log("condition +50 remplie");
-        boolean = document.querySelector("#root > div > div:nth-child(2) > main > div > div > div:nth-child(2) > div.w-full.ml-8 > form > div > div:nth-child(2) > div.flex.mb-4 > div > label.flex.items-center.cursor-pointer.bg-neutral-100.border.border-neutral-100.p-1.rounded-lg.hover\\:border-primary-600.moreThan50");
-        boolean.style.transition = "all 1s ease-in-out";
-        await delay(10);
-        boolean.style.backgroundColor = '#9fe8f2';
-
-    }else {
-        console.log("erreur dans la dimension")
+    async function fillAddress() {
+        console.log("fillAddress lancée");
+        // Check if the deliveryDetails object contains the address
+        if (deliveryDetails.address) {
+            console.log("searching for input field...");
+            do{
+                addressInput = document.querySelector('[id^="headlessui-combobox-input-"]');
+                await delay(50);
+            }while (!addressInput);
+            if (addressInput) {
+                console.log("Address input field found");
+                addressInput.value = deliveryDetails.address;
+                // Trigger any required events after setting the value
+            } else {
+                console.error("Address input field not found");
+            }
+        }
     }
 
 
-}
 
+    //Met place holder automatiquement
+    async function autoPlaceHolder(selector, value) {
+        let inputField = document.querySelector(selector);
 
+        do {
+            await delay(500);
+            inputField = document.querySelector(selector);
+        } while (!inputField || !isElementVisible(inputField));
 
-
-// -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
-
-// SCRIPT 3 : Colisweb Autofill
-// Execution :
-
-async function execution3() {
-
-    console.log("execution script 3");
-    //notification("alert", "Notification test")
-
-    const deliveryDetails = await fetchDeliveryDetails();
-
-    await fillAddress();
-
-    autoPlaceHolder("#recipientFirstName", deliveryDetails.firstName.toString());
-    //autoFill("#root > div > div:nth-child(2) > main > div > div > div:nth-child(2) > div.w-full.ml-8 > form > div > div:nth-child(2) > div:nth-child(1) > div.w-full.mr-4.firstname > div > label", deliveryDetails.firstName.toString());
-
-    autoPlaceHolder("#recipientLastName", deliveryDetails.name.toString());
-    //autoFill("#recipientLastName", deliveryDetails.name.toString());
-
-    autoPlaceHolder("#phone1", deliveryDetails.phone.toString());
-    //autoFill("#phone1", deliveryDetails.phone.toString());
-
-    await autoPlaceHolder("#packagesQuantity", deliveryDetails.packageMetrics.totalNumberOfPackages.toString());
-
-    autoPlaceHolder("#heaviest", deliveryDetails.packageMetrics.heaviestPackageWeight.toString());
-    autoPlaceHolder("#weight", deliveryDetails.packageMetrics.heaviestPackageWeight.toString());
-
-    autoPlaceHolder("#totalWeight", deliveryDetails.packageMetrics.totalWeight.toString());
-
-
-    autoPlaceHolder("#longest", deliveryDetails.packageMetrics.longestPackage.length.toString());
-    await autoPlaceHolder("#length", deliveryDetails.packageMetrics.longestPackage.length.toString());
-
-    highlightBooleanHeight(deliveryDetails.packageMetrics.longestPackage.height);
-    highlightBooleanWidth(deliveryDetails.packageMetrics.longestPackage.width);
-
-
-}
-
-
-
-// -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
-// -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
-
-// POP UP Casto SAV
-
-async function execution4() {
-    //Close pop-up after successfull request to SAV API
-    await delay (0);
-    closePopup("initAccueil.do");
-}
-
-
-
-
-
-// -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
-// -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
-// -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
-
-
-
-
-
-
-
-// MAIN :
-
-(async function main() {
-    'use strict';
-    const domain = window.location.hostname;
-    const path = window.location.pathname;
-
-    if (domain === "prod-agent.castorama.fr") { // Com+
-        await execution1();
-    } else if (path.includes("/login")) { // Log-in Popup
-        await execution2();
-    } else if (path.includes("create-delivery")) { // Colisweb
-        await execution3();
-    } else if (domain.includes("agile.intranet.castosav.castorama.fr:8080/") && path.includes("castoSav") ) { // SAV
-        await execution4();
+        console.log(`${selector} found and is visible. Setting placeholder.`);
+        inputField.setAttribute('placeholder', value);
     }
-})();
+
+
+
+    async function highlightBooleanHeight(value) {
+        let boolean = null
+        console.log("Valeur utilisée pour booléen : ", value);
+        let presenceBoolean = null;
+        do {
+            presenceBoolean = document.querySelector("#root > div > div:nth-child(2) > main > div > div > div:nth-child(2) > div.w-full.ml-8 > form > div > div:nth-child(2) > div.flex.mb-4 > div > label.flex.items-center.cursor-pointer.bg-neutral-100.border.border-neutral-100.p-1.rounded-lg.hover\\:border-primary-600.lessThan150");
+            await delay(200);
+        } while (!presenceBoolean);
+        console.log("booléen détecté");
+
+
+        if (value < 150){
+            console.log("condition -150 remplie");
+            boolean = document.querySelector("#root > div > div:nth-child(2) > main > div > div > div:nth-child(2) > div.w-full.ml-8 > form > div > div:nth-child(2) > div.flex.mb-4 > div > label.flex.items-center.cursor-pointer.bg-neutral-100.border.border-neutral-100.p-1.rounded-lg.hover\\:border-primary-600.lessThan150");
+            boolean.style.transition = "all 1s ease-in-out";
+            await delay(10);
+            boolean.style.backgroundColor = '#9fe8f2';
+
+        } else if (value >149 && value <181) {
+            console.log("condition 150<>180 remplie");
+            boolean = document.querySelector("#root > div > div:nth-child(2) > main > div > div > div:nth-child(2) > div.w-full.ml-8 > form > div > div:nth-child(2) > div.flex.mb-4 > div > label.flex.items-center.cursor-pointer.bg-neutral-100.border.border-neutral-100.p-1.rounded-lg.hover\\:border-primary-600.my-6.between150And180");
+            boolean.style.transition = "all 1s ease-in-out";
+            await delay(10);
+            boolean.style.backgroundColor = '#9fe8f2';
+
+        } else if (value >180) {
+            console.log("condition >180 remplie");
+            boolean = document.querySelector("#root > div > div:nth-child(2) > main > div > div > div:nth-child(2) > div.w-full.ml-8 > form > div > div:nth-child(2) > div.flex.mb-4 > div > label.flex.items-center.cursor-pointer.bg-neutral-100.border.border-neutral-100.p-1.rounded-lg.hover\\:border-primary-600.moreThan180");
+            boolean.style.transition = "all 1s ease-in-out";
+            await delay(10);
+            boolean.style.backgroundColor = '#9fe8f2';
+        }
+
+
+    }
+
+    async function highlightBooleanWidth(value) {
+        let boolean = null
+        console.log("Valeur utilisée pour booléen width: ", value);
+        let presenceBoolean = null;
+        do {
+            presenceBoolean = document.querySelector("#root > div > div:nth-child(2) > main > div > div > div:nth-child(2) > div.w-full.ml-8 > form > div > div:nth-child(2) > div.flex.mb-4 > div > label.flex.items-center.cursor-pointer.bg-neutral-100.border.border-neutral-100.p-1.rounded-lg.hover\\:border-primary-600.mb-6.lessThanOrEqualTo50");
+            await delay(200);
+
+        }while(!presenceBoolean);
+        console.log("booléen width détecté");
+
+        if (value < 51){
+            console.log("condition -50 remplie");
+            boolean = document.querySelector("#root > div > div:nth-child(2) > main > div > div > div:nth-child(2) > div.w-full.ml-8 > form > div > div:nth-child(2) > div.flex.mb-4 > div > label.flex.items-center.cursor-pointer.bg-neutral-100.border.border-neutral-100.p-1.rounded-lg.hover\\:border-primary-600.mb-6.lessThanOrEqualTo50");
+            boolean.style.transition = "all 1s ease-in-out";
+            await delay(10);
+            boolean.style.backgroundColor = '#9fe8f2';
+
+        }else if (value >50) {
+            console.log("condition +50 remplie");
+            boolean = document.querySelector("#root > div > div:nth-child(2) > main > div > div > div:nth-child(2) > div.w-full.ml-8 > form > div > div:nth-child(2) > div.flex.mb-4 > div > label.flex.items-center.cursor-pointer.bg-neutral-100.border.border-neutral-100.p-1.rounded-lg.hover\\:border-primary-600.moreThan50");
+            boolean.style.transition = "all 1s ease-in-out";
+            await delay(10);
+            boolean.style.backgroundColor = '#9fe8f2';
+
+        }else {
+            console.log("erreur dans la dimension")
+        }
+
+
+    }
+
+
+
+
+    // -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+    // SCRIPT 3 : Colisweb Autofill
+    // Execution :
+
+    async function execution3() {
+
+        console.log("execution script 3");
+        //notification("alert", "Notification test")
+
+        const deliveryDetails = await fetchDeliveryDetails();
+
+        await fillAddress();
+
+        autoPlaceHolder("#recipientFirstName", deliveryDetails.firstName.toString());
+        //autoFill("#root > div > div:nth-child(2) > main > div > div > div:nth-child(2) > div.w-full.ml-8 > form > div > div:nth-child(2) > div:nth-child(1) > div.w-full.mr-4.firstname > div > label", deliveryDetails.firstName.toString());
+
+        autoPlaceHolder("#recipientLastName", deliveryDetails.name.toString());
+        //autoFill("#recipientLastName", deliveryDetails.name.toString());
+
+        autoPlaceHolder("#phone1", deliveryDetails.phone.toString());
+        //autoFill("#phone1", deliveryDetails.phone.toString());
+
+        await autoPlaceHolder("#packagesQuantity", deliveryDetails.packageMetrics.totalNumberOfPackages.toString());
+
+        autoPlaceHolder("#heaviest", deliveryDetails.packageMetrics.heaviestPackageWeight.toString());
+        autoPlaceHolder("#weight", deliveryDetails.packageMetrics.heaviestPackageWeight.toString());
+
+        autoPlaceHolder("#totalWeight", deliveryDetails.packageMetrics.totalWeight.toString());
+
+
+        autoPlaceHolder("#longest", deliveryDetails.packageMetrics.longestPackage.length.toString());
+        await autoPlaceHolder("#length", deliveryDetails.packageMetrics.longestPackage.length.toString());
+
+        highlightBooleanHeight(deliveryDetails.packageMetrics.longestPackage.height);
+        highlightBooleanWidth(deliveryDetails.packageMetrics.longestPackage.width);
+
+
+    }
+
+
+
+    // -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+    // -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+    // POP UP Casto SAV
+
+    async function execution4() {
+        //Close pop-up after successfull request to SAV API
+        await delay (0);
+        closePopup("initAccueil.do");
+    }
+
+
+
+
+
+    // -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+    // -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+    // -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+
+
+
+
+
+
+    // MAIN :
+
+    (async function main() {
+        'use strict';
+        const domain = window.location.hostname;
+        const path = window.location.pathname;
+
+        if (domain === "prod-agent.castorama.fr") { // Com+
+            await execution1();
+        } else if (path.includes("/login")) { // Log-in Popup
+            await execution2();
+        } else if (path.includes("create-delivery")) { // Colisweb
+            await execution3();
+        } else if (domain.includes("agile.intranet.castosav.castorama.fr:8080/") && path.includes("castoSav") ) { // SAV
+            await execution4();
+        }
+    })();
