@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Coliweb Livraison Calculator2
 // @namespace    cstrm.scripts/colisweb1
-// @version      1.26
+// @version      1.27
 // @downloadURL  https://github.com/ArildWaldan/CWAutoDelivery/raw/main/coliswebAutoDelivery.user.js
 // @updateURL    https://github.com/ArildWaldan/CWAutoDelivery/raw/main/coliswebAutoDelivery.user.js
 // @description  Fetch and log package specifications
@@ -13,6 +13,7 @@
 // @match        http://agile.intranet.castosav.castorama.fr:8080/*
 // @match        https://*.castorama.fr/*
 // @match        https://bo.production.colisweb.com/*
+// @exclude      https://www.castorama.fr/
 // @grant        GM_xmlhttpRequest
 // @grant        GM.getValue
 // @grant        GM.setValue
