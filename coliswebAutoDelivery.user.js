@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Coliweb Livraison Calculator2
 // @namespace    cstrm.scripts/colisweb1
-// @version      1.25
+// @version      1.26
 // @downloadURL  https://github.com/ArildWaldan/CWAutoDelivery/raw/main/coliswebAutoDelivery.user.js
 // @updateURL    https://github.com/ArildWaldan/CWAutoDelivery/raw/main/coliswebAutoDelivery.user.js
 // @description  Fetch and log package specifications
@@ -754,7 +754,7 @@ async function setColiswebCookie() {
     try {
         const response = await makeCORSRequest(url, "POST", headers, JSON.stringify(payload)); //POST !!!!
         console.log("making request for new cookie", response)
-        //Here I need to get hold of the cookie set by the response, and probably GM.setValue it, so it can be used as basis for next session creation.
+/*         //Here I need to get hold of the cookie set by the response, and probably GM.setValue it, so it can be used as basis for next session creation.
         // Extract the "Set-Cookie" header from the response and update the global cookie
         const newCookie = response.headers['Set-Cookie'];
         if (newCookie) {
@@ -762,7 +762,7 @@ async function setColiswebCookie() {
             console.log("Colisweb Cookie updated successfully :", globalCookie );
         } else {
             console.error("Failed to update Colisweb cookie: Set-Cookie header missing");
-        }
+        } */
     } catch (error) {
         console.error("Error setting new Colisweb cookie:", error);
     }
