@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Coliweb Livraison Calculator2
 // @namespace    cstrm.scripts/colisweb1
-// @version      1.27
+// @version      1.28
 // @downloadURL  https://github.com/ArildWaldan/CWAutoDelivery/raw/main/coliswebAutoDelivery.user.js
 // @updateURL    https://github.com/ArildWaldan/CWAutoDelivery/raw/main/coliswebAutoDelivery.user.js
 // @description  Fetch and log package specifications
@@ -401,6 +401,13 @@ function createButton({ id, textContent, styles, onClick }) {
 
 // Centralized function to add both buttons
 function setupCustomButtons() {
+
+    const versionButton = createButton({
+    id: 'versionButton',
+        textContent: 'Estimer prix Colisweb',
+        styles: { marginLeft: '48px', marginTop: '0px', width: '148px' },
+        onClick: EstimerButtonAction
+    });
     estimateButton = createButton({
         id: 'Estimer-livraison',
         textContent: 'Estimer prix Colisweb',
@@ -1088,6 +1095,7 @@ async function onLivraisonButtonPress(eans, geocodeData, postalCode, firstName, 
 
     } catch (error) {
         console.error("An error occurred:", error);
+        notification("alert", "Calcul impossible. Actualisez la page et ré-essayez. Erreur : ", error);
         LoaderManager.hide();
         estimateButton.textContent = 'Estimer prix Colisweb';
 
