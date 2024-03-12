@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Coliweb Livraison Calculator2
 // @namespace    cstrm.scripts/colisweb1
-// @version      1.28
+// @version      1.29
 // @downloadURL  https://github.com/ArildWaldan/CWAutoDelivery/raw/main/coliswebAutoDelivery.user.js
 // @updateURL    https://github.com/ArildWaldan/CWAutoDelivery/raw/main/coliswebAutoDelivery.user.js
 // @description  Fetch and log package specifications
@@ -481,20 +481,20 @@ async function setSavCookie() {
     };
 
     //Mise à jour manuelle du cookie, peut être pas nécessaire, à voir si une simple requête fonctionne pour "set" le cookie
-    //try {
+    try {
     console.log("making the setSAVcookie request")
-    await makeCORSRequest(url, "GET", headers);
-    // Process the response
-    //  const newCookie = response.headers['Set-Cookie'];
-    //  if (newCookie) {
-    //      savCookie = newCookie;
-    //      console.log("SAV Cookie updated successfully");
-    //  } else {
-    //      console.error("Failed to update SAV cookie: Set-Cookie header missing");
-    //  }
-    // } catch (error) {
-    //      console.error("Error setting new SAV cookie:", error);
-    //   }
+    const response = await makeCORSRequest(url, "GET", headers);
+    //Process the response
+     const newCookie = response.headers['Set-Cookie'];
+     if (newCookie) {
+         savCookie = newCookie;
+         console.log("SAV Cookie updated successfully");
+     } else {
+         console.error("Failed to update SAV cookie: Set-Cookie header missing");
+     }
+    } catch (error) {
+         console.error("Error setting new SAV cookie:", error);
+      }
 }
 
 // Function to initialize session
@@ -863,6 +863,13 @@ async function fetchDeliveryOptions(geocodeData, packageMetrics, postalCode, glo
             notification("alert", "Aucune offre coliweb compatible pour cette commande, faites une demande de devis via ", "ce formulaire", "https://bo.production.colisweb.com/store/clients/249/stores/8481/quotation")
             throw new Error("Pas de formules coliweb existantes");
 
+        } else if (responseJson.error && responseJson.error.includes('distance')) {
+            LoaderManager.hide();
+            notification("alert", "Pas d'offres existantes à cette distance.");
+            return ("Aucune offre existante à cette distance.");
+            throw new Error("Pas de formules pour cette distance");
+
+
         } else if (responseJson.error && responseJson.error.includes('heavy')) {
             LoaderManager.hide();
             notification("alert", "Aucune offre coliweb compatible pour cette commande, faites une demande de devis via ", "ce formulaire", "https://bo.production.colisweb.com/store/clients/249/stores/8481/quotation")
@@ -1095,7 +1102,7 @@ async function onLivraisonButtonPress(eans, geocodeData, postalCode, firstName, 
 
     } catch (error) {
         console.error("An error occurred:", error);
-        notification("alert", "Calcul impossible. Actualisez la page et ré-essayez. Erreur : ", error);
+        notification("alert", "Calcul impossible. ", error);
         LoaderManager.hide();
         estimateButton.textContent = 'Estimer prix Colisweb';
 
