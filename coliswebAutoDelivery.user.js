@@ -541,9 +541,9 @@ async function fetchProductCode(barcode, savCookie) {
     console.log(responseText.substring(0, 50));
 
     // Check for failure response
-    let attemptCount = await GM.getValue('attemptCount') || 0;
-    console.log("Nombre de tentatives tentées: 0", attemptCount);
-    if (attemptCount < 2) {
+    //let attemptCount = await GM.getValue('attemptCount') || 0;
+    //console.log("Nombre de tentatives tentées: 0", attemptCount);
+    //if (attemptCount < 2) {
 
         if (responseText.includes("Copyright (C)")) {
             console.log("Detected cookie failure response, updating SAV cookie...");
@@ -551,14 +551,16 @@ async function fetchProductCode(barcode, savCookie) {
             await setSavCookie();
             console.log("setSAVcookie1 finished");
 
-            attemptCount++;
-            console.log("Nombre de tentatives tentées: 0", attemptCount);
-            await GM.setValue('attemptCount', attemptCount);
+          //  attemptCount++;
+          //  console.log("Nombre de tentatives tentées: 0", attemptCount);
+         //   await GM.setValue('attemptCount', attemptCount);
 
-            await delay(2000);
-            window.location.reload()
-        }
+         //   await delay(2000);
+         //   window.location.reload()
+  //      }
 
+        } else if (!responseText.includes("Copyright (C)")){
+            console.log("SAV correct");
 
     } else {
         console.error('Maximum attempts to set the cookie exceeded');
@@ -862,18 +864,21 @@ async function fetchDeliveryOptions(geocodeData, packageMetrics, postalCode, glo
             LoaderManager.hide();
             notification("alert", "Aucune offre coliweb compatible pour cette commande, faites une demande de devis via ", "ce formulaire", "https://bo.production.colisweb.com/store/clients/249/stores/8481/quotation")
             throw new Error("Pas de formules coliweb existantes");
+            return ("no_offer");
 
         } else if (responseJson.error && responseJson.error.includes('distance')) {
             LoaderManager.hide();
             notification("alert", "Pas d'offres existantes à cette distance.");
-            return ("Aucune offre existante à cette distance.");
+            return ("distance");
             throw new Error("Pas de formules pour cette distance");
 
 
         } else if (responseJson.error && responseJson.error.includes('heavy')) {
+            console.log("Response includes heavy");
             LoaderManager.hide();
-            notification("alert", "Aucune offre coliweb compatible pour cette commande, faites une demande de devis via ", "ce formulaire", "https://bo.production.colisweb.com/store/clients/249/stores/8481/quotation")
-            throw new Error("Pas de formules coliweb existantes");
+            notification("alert", "Cette commande est trop lourde pour Coliweb, faites une demande de devis via ", "ce formulaire", "https://bo.production.colisweb.com/store/clients/249/stores/8481/quotation")
+            //throw new Error("Pas de formules coliweb existantes");
+            return ("heavy");
 
 
         } else if (responseJson.calendar && responseJson.calendar.length > 0) {
@@ -894,8 +899,8 @@ async function fetchDeliveryOptions(geocodeData, packageMetrics, postalCode, glo
     } catch (error) {
         console.error("Error fetching delivery options:", error);
         LoaderManager.hide();
-        throw new Error ("error");
-        return null; // Or return a specific error indicator
+        //throw new Error ("error");
+        return ("Erreur inconue"); // Or return a specific error indicator
     }
 }
 
@@ -1055,7 +1060,7 @@ async function onLivraisonButtonPress(eans, geocodeData, postalCode, firstName, 
                     fetchedProductData.push({ packageData, quantity });
                     console.log("Package Data for EAN " + ean + ": ", packageData);
                 }
-            } else throw new Error("Reconnexion au SAV nécessaire");
+            } else throw new Error("Problème avec le portail SAV");
 
         }
 
@@ -1067,10 +1072,20 @@ async function onLivraisonButtonPress(eans, geocodeData, postalCode, firstName, 
         let currentAttempt = 0;
         let response;
         response = await fetchDeliveryOptions(geocodeData, packageMetrics, postalCode, globalCookie);
+        console.log("response to fetchDeliveryOptions returned: ", response);
 
-        if (response.exp?.includes("expired") || response.message?.includes("Unauthorized")) {
+        if (response?.exp?.includes("expired") || response?.message?.includes("Unauthorized")) {
+            console.log("Session coliweb invalide");
             await setColiswebCookie();
             response = await fetchDeliveryOptions();
+
+
+        } else if (response === "heavy" || response === "distance" || response === "no_offer") {
+            console.log("Soft exit :", response);
+            return;
+
+
+
         } else if (response) { //Colisweb API SUCCESS!
             // "success" scenario
             deliveryDetails = {
@@ -1094,17 +1109,18 @@ async function onLivraisonButtonPress(eans, geocodeData, postalCode, firstName, 
 
 
         } else {
-            console.error("Failed to fetch delivery options after several attempts.")
+            console.error("Failed to fetch delivery options.")
             LoaderManager.hide();
             notification("alert", "Veuillez vous reconnecter à Colisweb", "Cliquez ici", "https://bo.production.colisweb.com/login");
             estimateButton.textContent = 'Estimer prix Colisweb';
         }
 
     } catch (error) {
+        estimateButton.textContent = 'Estimer prix Colisweb'
         console.error("An error occurred:", error);
         notification("alert", "Calcul impossible. ", error);
         LoaderManager.hide();
-        estimateButton.textContent = 'Estimer prix Colisweb';
+        ;
 
     }
 }
