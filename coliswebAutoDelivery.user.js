@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Coliweb Livraison Calculator2
 // @namespace    cstrm.scripts/colisweb1
-// @version      1.29
+// @version      1.30
 // @downloadURL  https://github.com/ArildWaldan/CWAutoDelivery/raw/main/coliswebAutoDelivery.user.js
 // @updateURL    https://github.com/ArildWaldan/CWAutoDelivery/raw/main/coliswebAutoDelivery.user.js
 // @description  Fetch and log package specifications
@@ -482,16 +482,17 @@ async function setSavCookie() {
 
     //Mise à jour manuelle du cookie, peut être pas nécessaire, à voir si une simple requête fonctionne pour "set" le cookie
     try {
-    console.log("making the setSAVcookie request")
-    const response = await makeCORSRequest(url, "GET", headers);
+        console.log("making the setSAVcookie request")
+        const response = await makeCORSRequest(url, "GET", headers);
+        console.log("SAVCookie response : ", response);
     //Process the response
-     const newCookie = response.headers['Set-Cookie'];
-     if (newCookie) {
-         savCookie = newCookie;
-         console.log("SAV Cookie updated successfully");
-     } else {
-         console.error("Failed to update SAV cookie: Set-Cookie header missing");
-     }
+     // const newCookie = response.headers['Set-Cookie'];
+     // if (newCookie) {
+     //     savCookie = newCookie;
+     //     console.log("SAV Cookie updated successfully");
+     // } else {
+     //     console.error("Failed to update SAV cookie: Set-Cookie header missing");
+     // }
     } catch (error) {
          console.error("Error setting new SAV cookie:", error);
       }
@@ -551,13 +552,11 @@ async function fetchProductCode(barcode, savCookie) {
             await setSavCookie();
             console.log("setSAVcookie1 finished");
 
-          //  attemptCount++;
-          //  console.log("Nombre de tentatives tentées: 0", attemptCount);
-         //   await GM.setValue('attemptCount', attemptCount);
-
-         //   await delay(2000);
-         //   window.location.reload()
-  //      }
+            SAV_popupWindow = window.open("http://agile.intranet.castosav.castorama.fr:8080/castoSav", "SAV_popupWindow", "width=100,height=100,scrollbars=no");
+            console.log("opening SAV popup");
+            await delay(1000);
+            await setupCustomButtons();
+            return responseText;
 
         } else if (!responseText.includes("Copyright (C)")){
             console.log("SAV correct");
@@ -905,14 +904,15 @@ async function fetchDeliveryOptions(geocodeData, packageMetrics, postalCode, glo
 }
 
 
-// Custom notifications
-let CW_popupWindow = null
-function notification(type, message, linkText,linkURL) {
+// Custom notifications setup
+let lastNotificationBottom = 0;
+let notificationsCount = 0; // Track the number of active notifications
+let CW_popupWindow = null;
 
+function notification(type, message, linkText, linkURL) {
     const notification = document.createElement("div");
     notification.innerText = message;
     notification.style.position = "fixed";
-    notification.style.top = "50%";
     notification.style.left = "50%";
     notification.style.backgroundColor = "#af4c4c";
     notification.style.color = "white";
@@ -926,66 +926,70 @@ function notification(type, message, linkText,linkURL) {
     notification.style.alignItems = "center";
     notification.style.justifyContent = "center";
     notification.style.textAlign = "center";
-    //ajouts
-    notification.style.font = 'bold 1em / 1.25 Arial,Helvetica,sans-serif';
+    notification.style.font = 'bold 1em / 1.25 Arial, Helvetica, sans-serif';
     notification.style.fontSize = "110%";
     notification.style.transition = "all 0.5s ease-in-out";
     notification.style.opacity = "0";
-    notification.style.transform = "translate(-50%, -50%) scale(0)";
-    //conditionals
-    if (type == "alert") {
-        notification.style.background = "linear-gradient(to right, rgba(175,76,76), rgba(157,68,68))"; }
-    else {
-        notification.style.backgroundColor = "#0078d7";}
+    notification.style.transform = "translate(-50%, -100%) scale(0)";
 
+    if (type == "alert") {
+        notification.style.background = "linear-gradient(to right, rgba(175,76,76), rgba(157,68,68))";
+    } else {
+        notification.style.backgroundColor = "#0078d7";
+    }
 
     document.body.appendChild(notification);
+    notificationsCount++;
+
+    // Force reflow/repaint
+    const forcedReflow = notification.offsetHeight;
+
+    if (lastNotificationBottom === 0) {
+        notification.style.top = "50%";
+        notification.style.transform = "translate(-50%, -50%) scale(0)";
+    } else {
+        notification.style.top = `${lastNotificationBottom + 50}px`;
+        notification.style.transform = "translate(-50%, 0) scale(0)";
+    }
+
+    // Delay to allow the browser to render and calculate sizes
     setTimeout(() => {
         notification.style.opacity = "1";
         notification.style.transform = "translate(-50%, -50%) scale(1)";
-        notification.style.boxShadow = "0 10px 8px rgba(0,0,0,0.4)"
+        if (lastNotificationBottom !== 0) {
+            notification.style.transform = "translate(-50%, 0) scale(1)";
+        }
 
-
+        // Update the position for the next notification
+        const notificationRect = notification.getBoundingClientRect();
+        lastNotificationBottom = notificationRect.bottom;
     }, 10);
 
-
-    // If linkText and linkURL are provided, create and append the hyperlink
     if (linkText && linkURL) {
         const hyperlink = document.createElement("a");
         hyperlink.href = linkURL;
-        hyperlink.innerText = ` ${linkText}`; // Space added before link text for separation
-        hyperlink.style.color = "#ffff00"; // Example: yellow color for visibility
+        hyperlink.innerText = ` ${linkText}`;
+        hyperlink.style.color = "#ffff00";
         hyperlink.style.textDecoration = "underline";
-        //hyperlink.target = "_blank"; // Optional: Opens the link in a new tab
-
-        // Event listener to open link in a popup window
         hyperlink.addEventListener("click", function(event) {
-            event.preventDefault(); // Prevent the default anchor action
+            event.preventDefault();
             CW_popupWindow = window.open(linkURL, "CW_popupWindow", "width=400,height=400,scrollbars=no");
         });
 
-        // Append the hyperlink to the notification
         notification.appendChild(hyperlink);
-
-
-        const lineBreak = document.createElement("br");
-        notification.appendChild(lineBreak);
-
-        // Append the hyperlink to the notification
-        notification.appendChild(hyperlink);
-
     }
 
     setTimeout(() => {
-        notification.style.opacity = '0'; // Initiate fade-out
+        notification.style.opacity = '0';
+        setTimeout(() => {
+            notification.remove();
+            notificationsCount--;
+            if (notificationsCount === 0) {
+                lastNotificationBottom = 0;
+            }
+        }, 600); // Slightly offset to allow for transition overlap
     }, 5000);
-
-    setTimeout(() => {
-        notification.remove();
-    }, 6000);
-
 }
-
 
 
 
@@ -1060,7 +1064,10 @@ async function onLivraisonButtonPress(eans, geocodeData, postalCode, firstName, 
                     fetchedProductData.push({ packageData, quantity });
                     console.log("Package Data for EAN " + ean + ": ", packageData);
                 }
-            } else throw new Error("Problème avec le portail SAV");
+            } else {
+                console.error(`Error: Article with EAN ${ean} non-existent in the SAV portal.`);
+                notification("alert", `Erreur : article avec EAN ${ean} inexistant sur le portail SAV.`);
+            }
 
         }
 
