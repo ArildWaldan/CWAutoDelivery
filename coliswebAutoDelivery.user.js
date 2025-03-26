@@ -1,5 +1,5 @@
 // ==UserScript==
-// @name         Coliweb Livraison Calculator2
+// @name         Coliweb Livraison Calculator2(testdev)
 // @namespace    cstrm.scripts/colisweb1
 // @version      1.29
 // @downloadURL  https://github.com/ArildWaldan/CWAutoDelivery/raw/main/coliswebAutoDelivery.user.js
@@ -770,7 +770,7 @@ function calculatePackageMetrics(fetchedData) {
     };
 }
 
-let globalCookie = ""; 
+let globalCookie = "";
 async function setColiswebCookie() {
 
     const logID = "Y2FzdG9tZXR6MDEy";
@@ -796,7 +796,7 @@ async function setColiswebCookie() {
     }
 
     try {
-        const response = await makeCORSRequest(url, "POST", headers, JSON.stringify(payload)); 
+        const response = await makeCORSRequest(url, "POST", headers, JSON.stringify(payload));
         console.log("making request for new cookie", response)
 
     } catch (error) {
@@ -930,94 +930,309 @@ async function fetchDeliveryOptions(geocodeData, packageMetrics, postalCode, glo
 }
 
 
-// Custom notifications setup
-let lastNotificationBottom = 0;
-let notificationsCount = 0; // Track the number of active notifications
-let CW_popupWindow = null;
+// Enhanced notification system
+let notificationContainer = null;
+let notificationsCount = 0;
+let notificationQueue = [];
+let isProcessingQueue = false;
 
-function notification(type, message, linkText, linkURL) {
-    const notification = document.createElement("div");
-    notification.innerText = message;
-    notification.style.position = "fixed";
-    notification.style.left = "50%";
-    notification.style.backgroundColor = "#af4c4c";
-    notification.style.color = "white";
-    notification.style.padding = "15px 30px";
-    notification.style.borderRadius = "30px";
-    notification.style.boxShadow = "0 0px 1px rgba(0,0,0,0.2)";
-    notification.style.width = 'auto';
-    notification.style.zIndex = "1000";
-    notification.style.display = "flex";
-    notification.style.flexDirection = "column";
-    notification.style.alignItems = "center";
-    notification.style.justifyContent = "center";
-    notification.style.textAlign = "center";
-    notification.style.font = 'bold 1em / 1.25 Arial, Helvetica, sans-serif';
-    notification.style.fontSize = "110%";
-    notification.style.transition = "all 0.5s ease-in-out";
-    notification.style.opacity = "0";
-    notification.style.transform = "translate(-50%, -100%) scale(0)";
-
-    if (type == "alert") {
-        notification.style.background = "linear-gradient(to right, rgba(175,76,76), rgba(157,68,68))";
-    } else {
-        notification.style.backgroundColor = "#0078d7";
+// Create a container for all notifications if it doesn't exist
+function createNotificationContainer() {
+    if (!notificationContainer) {
+        notificationContainer = document.createElement("div");
+        notificationContainer.id = "tm-notification-container";
+        notificationContainer.style.position = "fixed";
+        notificationContainer.style.top = "50%";
+        notificationContainer.style.left = "50%";
+        notificationContainer.style.transform = "translate(-50%, -50%)";
+        notificationContainer.style.display = "flex";
+        notificationContainer.style.flexDirection = "column";
+        notificationContainer.style.gap = "10px";
+        notificationContainer.style.maxHeight = "80vh";
+        notificationContainer.style.maxWidth = "90vw";
+        notificationContainer.style.overflow = "auto";
+        notificationContainer.style.zIndex = "10000";
+        document.body.appendChild(notificationContainer);
     }
-
-    document.body.appendChild(notification);
-    notificationsCount++;
-
-    // Force reflow/repaint
-    const forcedReflow = notification.offsetHeight;
-
-    if (lastNotificationBottom === 0) {
-        notification.style.top = "50%";
-        notification.style.transform = "translate(-50%, -50%) scale(0)";
-    } else {
-        notification.style.top = `${lastNotificationBottom + 50}px`;
-        notification.style.transform = "translate(-50%, 0) scale(0)";
-    }
-
-    // Delay to allow the browser to render and calculate sizes
-    setTimeout(() => {
-        notification.style.opacity = "1";
-        notification.style.transform = "translate(-50%, -50%) scale(1)";
-        if (lastNotificationBottom !== 0) {
-            notification.style.transform = "translate(-50%, 0) scale(1)";
-        }
-
-        // Update the position for the next notification
-        const notificationRect = notification.getBoundingClientRect();
-        lastNotificationBottom = notificationRect.bottom;
-    }, 10);
-
-    if (linkText && linkURL) {
-        const hyperlink = document.createElement("a");
-        hyperlink.href = linkURL;
-        hyperlink.innerText = ` ${linkText}`;
-        hyperlink.style.color = "#ffff00";
-        hyperlink.style.textDecoration = "underline";
-        hyperlink.addEventListener("click", function(event) {
-            event.preventDefault();
-            CW_popupWindow = window.open(linkURL, "CW_popupWindow", "width=400,height=400,scrollbars=no");
-        });
-
-        notification.appendChild(hyperlink);
-    }
-
-    setTimeout(() => {
-        notification.style.opacity = '0';
-        setTimeout(() => {
-            notification.remove();
-            notificationsCount--;
-            if (notificationsCount === 0) {
-                lastNotificationBottom = 0;
-            }
-        }, 600); // Slightly offset to allow for transition overlap
-    }, 5000);
+    return notificationContainer;
 }
 
+// Process the notification queue
+function processNotificationQueue() {
+    if (isProcessingQueue || notificationQueue.length === 0) return;
 
+    isProcessingQueue = true;
+    const notificationData = notificationQueue.shift();
+    showNotification(notificationData.type, notificationData.message, notificationData.details, notificationData.linkText, notificationData.linkURL);
+
+    setTimeout(() => {
+        isProcessingQueue = false;
+        processNotificationQueue();
+    }, 300);
+}
+
+// Main notification function
+function notification(type, message, linkText, linkURL, details = null) {
+    createNotificationContainer();
+
+    // Add to queue
+    notificationQueue.push({ type, message, details, linkText, linkURL });
+
+    // Process queue if not already processing
+    if (!isProcessingQueue) {
+        processNotificationQueue();
+    }
+}
+
+// Function to show a notification
+function showNotification(type, message, details = null, linkText = null, linkURL = null) {
+    const container = createNotificationContainer();
+
+    // Create notification element
+    const notification = document.createElement("div");
+    notification.className = "tm-notification";
+    notification.style.backgroundColor = type === "alert" ? "#f44336" : "#0078d7";
+    notification.style.color = "white";
+    notification.style.padding = "15px";
+    notification.style.borderRadius = "8px";
+    notification.style.boxShadow = "0 4px 12px rgba(0,0,0,0.3)";
+    notification.style.width = "350px";
+    notification.style.maxWidth = "100%";
+    notification.style.position = "relative";
+    notification.style.opacity = "0";
+    notification.style.transform = "scale(0.95)";
+    notification.style.transition = "all 0.3s ease-out";
+
+    // Add notification header
+    const header = document.createElement("div");
+    header.style.display = "flex";
+    header.style.justifyContent = "space-between";
+    header.style.alignItems = "center";
+    header.style.marginBottom = "10px";
+
+    // Add title based on type
+    const title = document.createElement("div");
+    title.style.fontWeight = "bold";
+    title.style.fontSize = "16px";
+    title.style.display = "flex";
+    title.style.alignItems = "center";
+    title.style.gap = "8px";
+
+    // Add icon based on type
+    const icon = document.createElement("span");
+    if (type === "alert") {
+        icon.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg>`;
+        title.appendChild(icon);
+        title.appendChild(document.createTextNode("Alerte"));
+    } else {
+        icon.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg>`;
+        title.appendChild(icon);
+        title.appendChild(document.createTextNode("Information"));
+    }
+
+    header.appendChild(title);
+
+    // Add close button
+    const closeBtn = document.createElement("button");
+    closeBtn.style.background = "transparent";
+    closeBtn.style.border = "none";
+    closeBtn.style.color = "white";
+    closeBtn.style.cursor = "pointer";
+    closeBtn.style.padding = "0";
+    closeBtn.style.width = "24px";
+    closeBtn.style.height = "24px";
+    closeBtn.style.display = "flex";
+    closeBtn.style.alignItems = "center";
+    closeBtn.style.justifyContent = "center";
+    closeBtn.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>`;
+    closeBtn.addEventListener("click", () => {
+        removeNotification(notification);
+    });
+
+    header.appendChild(closeBtn);
+    notification.appendChild(header);
+
+    // Add content
+    const content = document.createElement("div");
+    content.style.marginBottom = linkText || details ? "10px" : "0";
+    content.style.lineHeight = "1.4";
+    content.style.wordBreak = "break-word";
+    content.textContent = message;
+    notification.appendChild(content);
+
+    // Add details if provided
+    if (details) {
+        const detailsContainer = document.createElement("div");
+        detailsContainer.style.marginTop = "10px";
+        detailsContainer.style.fontSize = "14px";
+        detailsContainer.style.backgroundColor = "rgba(255, 255, 255, 0.1)";
+        detailsContainer.style.padding = "10px";
+        detailsContainer.style.borderRadius = "4px";
+
+        if (typeof details === 'object') {
+            for (const [key, value] of Object.entries(details)) {
+                const detailItem = document.createElement("div");
+                detailItem.style.display = "flex";
+                detailItem.style.justifyContent = "space-between";
+                detailItem.style.marginBottom = "5px";
+
+                const detailKey = document.createElement("span");
+                detailKey.style.fontWeight = "bold";
+                detailKey.textContent = key + ":";
+
+                const detailValue = document.createElement("span");
+                detailValue.textContent = value;
+
+                detailItem.appendChild(detailKey);
+                detailItem.appendChild(detailValue);
+                detailsContainer.appendChild(detailItem);
+            }
+        } else {
+            detailsContainer.textContent = details;
+        }
+
+        notification.appendChild(detailsContainer);
+    }
+
+    // Add link if provided
+    if (linkText && linkURL) {
+        const linkContainer = document.createElement("div");
+        linkContainer.style.marginTop = "10px";
+
+        const link = document.createElement("a");
+        link.href = linkURL;
+        link.textContent = linkText;
+        link.style.color = "#ffffff";
+        link.style.textDecoration = "underline";
+        link.style.display = "inline-block";
+        link.style.padding = "5px 10px";
+        link.style.backgroundColor = "rgba(255, 255, 255, 0.15)";
+        link.style.borderRadius = "4px";
+        link.style.transition = "background-color 0.2s";
+
+        link.addEventListener("mouseover", () => {
+            link.style.backgroundColor = "rgba(255, 255, 255, 0.25)";
+        });
+
+        link.addEventListener("mouseout", () => {
+            link.style.backgroundColor = "rgba(255, 255, 255, 0.15)";
+        });
+
+        link.addEventListener("click", (event) => {
+            event.preventDefault();
+            window.open(linkURL, "CW_popupWindow", "width=800,height=600,scrollbars=yes");
+        });
+
+        linkContainer.appendChild(link);
+        notification.appendChild(linkContainer);
+    }
+
+    // Add notification to container
+    container.appendChild(notification);
+    notificationsCount++;
+
+    // Trigger animation
+    setTimeout(() => {
+        notification.style.opacity = "1";
+        notification.style.transform = "scale(1)";
+    }, 10);
+
+    // Auto-remove after 15 seconds for alert types only
+    if (type === "alert") {
+        setTimeout(() => {
+            if (notification.parentNode) {
+                removeNotification(notification);
+            }
+        }, 15000);
+    }
+
+    // If there are multiple notifications, add a semi-transparent overlay
+    if (notificationsCount > 1) {
+        addOverlay();
+    }
+}
+
+// Function to add a semi-transparent overlay behind notifications
+function addOverlay() {
+    if (!document.getElementById('tm-notification-overlay')) {
+        const overlay = document.createElement("div");
+        overlay.id = "tm-notification-overlay";
+        overlay.style.position = "fixed";
+        overlay.style.top = "0";
+        overlay.style.left = "0";
+        overlay.style.width = "100%";
+        overlay.style.height = "100%";
+        overlay.style.backgroundColor = "rgba(0, 0, 0, 0.5)";
+        overlay.style.zIndex = "9999";
+        document.body.appendChild(overlay);
+
+        overlay.addEventListener('click', () => {
+            // Close all notifications when clicking outside
+            removeAllNotifications();
+        });
+    }
+}
+
+// Function to remove the overlay
+function removeOverlay() {
+    const overlay = document.getElementById('tm-notification-overlay');
+    if (overlay) {
+        overlay.parentNode.removeChild(overlay);
+    }
+}
+
+// Function to remove a notification
+function removeNotification(notification) {
+    notification.style.opacity = "0";
+    notification.style.transform = "scale(0.95)";
+
+    setTimeout(() => {
+        if (notification.parentNode) {
+            notification.parentNode.removeChild(notification);
+            notificationsCount--;
+
+            // Clean up container if no notifications
+            if (notificationsCount === 0) {
+                if (notificationContainer) {
+                    notificationContainer.parentNode.removeChild(notificationContainer);
+                    notificationContainer = null;
+                }
+                removeOverlay();
+            }
+        }
+    }, 300);
+}
+
+// Function to remove all notifications
+function removeAllNotifications() {
+    if (notificationContainer) {
+        const notifications = notificationContainer.querySelectorAll('.tm-notification');
+        notifications.forEach(notification => {
+            removeNotification(notification);
+        });
+    }
+    removeOverlay();
+}
+
+// Function to show delivery quote details
+function showDeliveryQuote(priceWithTaxes, packageMetrics, processedEANs, failedEANs = []) {
+    const adjustedPrice = priceWithTaxes * 1.0376;
+    const roundedPrice = parseFloat(adjustedPrice.toFixed(2));
+
+    const details = {
+        "Prix (HT)": priceWithTaxes.toFixed(2) + " €",
+        "Prix (TTC)": roundedPrice + " €",
+        "Nombre de colis": packageMetrics.totalNumberOfPackages,
+        "Poids total": packageMetrics.totalWeight + " kg",
+        "Dimensions max": `${packageMetrics.longestPackage?.length}×${packageMetrics.longestPackage?.width}×${packageMetrics.longestPackage?.height} cm`
+    };
+
+    if (failedEANs.length > 0) {
+        details["EANs non traités"] = failedEANs.join(", ");
+    }
+
+    notification("", `Prix de livraison Colisweb: ${roundedPrice} €`, null, null, details);
+}
 
 
 
@@ -1191,7 +1406,7 @@ function isElementVisible(element) {
 
 
 
-async function autoFill(selector, value) {
+async function fillReactInput(selector, value) {
     let inputField = document.querySelector(selector);
 
     // Wait until the element is visible
@@ -1200,8 +1415,71 @@ async function autoFill(selector, value) {
         inputField = document.querySelector(selector);
     } while (!inputField || !isElementVisible(inputField));
 
-    console.log(`${selector} found and is visible. Setting placeholder.`);
-    inputField.setAttribute('placeholder', value);
+    console.log(`${selector} found and is visible. Setting React value: ${value}`);
+
+    // Get the React fiber instance
+    const reactKey = Object.keys(inputField).find(key => key.startsWith('__reactProps$'));
+
+    if (reactKey) {
+        // React 17+ approach - manipulate the value and trigger onChange
+        const nativeInputValueSetter = Object.getOwnPropertyDescriptor(
+            window.HTMLInputElement.prototype, "value"
+        ).set;
+
+        nativeInputValueSetter.call(inputField, value);
+
+        // Dispatch React synthetic event
+        inputField.dispatchEvent(new Event('input', { bubbles: true }));
+        inputField.dispatchEvent(new Event('change', { bubbles: true }));
+    } else {
+        // Fallback to direct manipulation + events
+        inputField.value = value;
+
+        // Create and dispatch input and change events
+        ['input', 'change'].forEach(eventType => {
+            const event = new Event(eventType, { bubbles: true });
+            inputField.dispatchEvent(event);
+        });
+    }
+}
+
+async function fillAddressCombobox() {
+    console.log("fillAddressCombobox called");
+    if (!deliveryDetails.address) {
+        console.error("No address found in deliveryDetails");
+        return;
+    }
+
+    let addressInput = null;
+    do {
+        addressInput = document.querySelector('[id^="headlessui-combobox-input-"]');
+        await delay(50);
+    } while (!addressInput);
+
+    console.log("Address input field found");
+
+    // Focus the field first
+    addressInput.focus();
+
+    // Set the value
+    addressInput.value = deliveryDetails.address;
+
+    // Dispatch input event to trigger the dropdown
+    addressInput.dispatchEvent(new Event('input', { bubbles: true }));
+
+    // Wait for dropdown to potentially appear
+    await delay(300);
+
+    // Try to find and click the first dropdown option
+    const firstOption = document.querySelector('[id^="headlessui-combobox-option-"]');
+    if (firstOption) {
+        console.log("Found dropdown option, clicking it");
+        firstOption.click();
+    } else {
+        // If no dropdown appears, just trigger change and blur events
+        addressInput.dispatchEvent(new Event('change', { bubbles: true }));
+        addressInput.blur();
+    }
 }
 
 
@@ -1250,8 +1528,8 @@ const logPW = "Y3cxMg=="
 async function execution2() {
 
     console.log("execution script 2 (login)");
-    autoFill("#username", atob(logID));
-    autoFill("#Password", atob(logPW));
+    fillReactInput("#username", atob(logID));
+    fillReactInput("#Password", atob(logPW));
     closePopup('external');
 }
 
@@ -1266,19 +1544,144 @@ async function execution2() {
 // SCRIPT 3 : Colisweb Autfill
 // Functions
 
-// Function to retrieve and log the stored delivery details
-async function fetchDeliveryDetails() {
-    const storedDeliveryDetails = await GM.getValue("deliveryDetails", "{}");
-    console.log("Manually retrieved Data:", storedDeliveryDetails);
-    //let deliveryDetails;
 
+// Function to fetch delivery options (modified)
+
+async function fetchDeliveryOptions(geocodeData, packageMetrics, postalCode, globalCookie) {
+    console.log("Fetching delivery options with geocode data and package metrics");
+
+    const url = "https://api.production.colisweb.com/api/v5/clients/249/stores/8481/deliveryOptions";
+    const headers = {
+        "Content-Type": "application/json",
+        "Cookie": globalCookie
+    };
+
+    // Calculate dynamic dates
+    const now = new Date(); // Represents the current date and time
+    const endDate = new Date(now);
+    endDate.setDate(now.getDate() + 2); // Adds 2 days to the current date
+
+    const payload = {
+        "startDate": now.toISOString(),
+        "endDate": endDate.toISOString(),
+        "pickupAddress": {
+            "latitude": 49.0750948,
+            "longitude": 6.1000448,
+            "postalCode": "57130",
+            "storeId": "8481",
+            "geocodingLevel": "streetAddress",
+            "administrativeArea": {
+                "name": "",
+                "code": "44",
+                "code2": "57",
+                "code3": "579",
+                "countryCode": "FR"
+            }
+        },
+        "shippingAddress": {
+            "latitude": geocodeData.latitude,
+            "longitude": geocodeData.longitude,
+            "postalCode": postalCode,
+            "additionalInformation": {
+                "floor": null,
+                "hasLift": "maybe_lift"
+            },
+            "geocodingLevel": "streetAddress",
+            "administrativeArea": {
+                "name": "Grand Est",
+                "code": "44",
+                "code2": "57",
+                "code3": "579",
+                "countryCode": "FR"
+            }
+        },
+        "packaging": {
+            "numberOfPackets": packageMetrics.totalNumberOfPackages,
+            "heightCm": packageMetrics.longestPackage?.height,
+            "lengthCm": packageMetrics.longestPackage?.length,
+            "widthCm": packageMetrics.longestPackage?.width,
+            "weightKg": packageMetrics.totalWeight,
+            "maxPacketWeightKg": packageMetrics.heaviestPackageWeight,
+            "maxPacketLengthCm": packageMetrics.longestPackageLength
+        },
+        "requiredSkills": ["sidewalkdelivery"]
+    };
+
+    // RESPONSE PARSING
     try {
-        deliveryDetails = JSON.parse(storedDeliveryDetails);
-        console.log("Delivery details chopés:", deliveryDetails);
-        return deliveryDetails; // Return the parsed object
-    } catch(e) {
-        console.error("Error parsing delivery details:", e);
-        return {}; // Return an empty object in case of error
+        const responseText = await makeCORSRequest(url, "POST", headers, JSON.stringify(payload));
+        const responseJson = JSON.parse(responseText);
+        console.log(responseText.substring(0, 500));
+
+        if (responseJson.code && responseJson.code.includes('EXPIRED')) {
+            LoaderManager.hide();
+            console.log("cockblocked");
+            notification("alert", "Session Colisweb expirée", "Se reconnecter", "https://bo.production.colisweb.com/login");
+            return responseJson;
+        } else if (responseJson.exp?.includes("expired") || responseJson.message?.includes("Unauthorized")) {
+            LoaderManager.hide();
+            console.log("cockblocked : ", responseJson);
+            notification("alert", "Session Colisweb non autorisée", "Se reconnecter", "https://bo.production.colisweb.com/login");
+            return responseJson;
+        } else if (responseJson.code && responseJson.code.includes('LOAD')) {
+            LoaderManager.hide();
+            notification("alert", "Aucune offre Colisweb compatible pour cette commande", "Demander un devis", "https://bo.production.colisweb.com/store/clients/249/stores/8481/quotation", {
+                "Raison": "Capacité de livraison dépassée",
+                "Nombre de colis": packageMetrics.totalNumberOfPackages,
+                "Poids total": packageMetrics.totalWeight + " kg"
+            });
+            return "no_offer";
+        } else if (responseJson.error && responseJson.error.includes('distance')) {
+            LoaderManager.hide();
+            notification("alert", "Pas d'offres existantes à cette distance", null, null, {
+                "Raison": "Distance trop élevée",
+                "Solution": "Contactez le service client Colisweb"
+            });
+            return "distance";
+        } else if (responseJson.error && responseJson.error.includes('heavy')) {
+            console.log("Response includes heavy");
+            LoaderManager.hide();
+            notification("alert", "Cette commande est trop lourde pour Colisweb", "Demander un devis", "https://bo.production.colisweb.com/store/clients/249/stores/8481/quotation", {
+                "Raison": "Poids maximum dépassé",
+                "Poids total": packageMetrics.totalWeight + " kg",
+                "Poids maximum": "100 kg"
+            });
+            return "heavy";
+        } else if (responseJson.calendar && responseJson.calendar.length > 0) {
+            const priceWithTaxes = parseFloat(responseJson.calendar[0].priceWithTaxes); // Ensure it's a number
+            console.log("Prix coliweb:", priceWithTaxes);
+
+            // Get failed EANs (those without valid package data)
+            const failedEANs = fetchedProductData
+                .filter(item => !item.packageData || item.packageData.includes("Unavailable"))
+                .map(item => item.ean)
+                .filter(Boolean); // Filter out undefined values
+
+            LoaderManager.hide();
+
+            // Call the showDeliveryQuote function with proper arguments
+            showDeliveryQuote(
+                priceWithTaxes,
+                packageMetrics,
+                fetchedProductData.map(item => item.ean).filter(Boolean),
+                failedEANs
+            );
+
+            return priceWithTaxes;
+        } else {
+            LoaderManager.hide();
+            notification("alert", "Aucune donnée de prix disponible", null, null, {
+                "Suggestion": "Vérifiez les données du colis ou contactez Colisweb"
+            });
+            return null;
+        }
+    } catch (error) {
+        console.error("Error fetching delivery options:", error);
+        LoaderManager.hide();
+        notification("alert", "Erreur lors de la récupération des options de livraison", null, null, {
+            "Erreur": error.message || "Erreur inconnue"
+        });
+        return "error";
     }
 }
 
@@ -1401,6 +1804,22 @@ async function highlightBooleanWidth(value) {
 }
 
 
+// Function to retrieve and log the stored delivery details
+async function fetchDeliveryDetails() {
+    const storedDeliveryDetails = await GM.getValue("deliveryDetails", "{}");
+    console.log("Manually retrieved Data:", storedDeliveryDetails);
+    //let deliveryDetails;
+
+    try {
+        deliveryDetails = JSON.parse(storedDeliveryDetails);
+        console.log("Delivery details chopés:", deliveryDetails);
+        return deliveryDetails; // Return the parsed object
+    } catch(e) {
+        console.error("Error parsing delivery details:", e);
+        return {}; // Return an empty object in case of error
+    }
+}
+
 
 
 // -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
@@ -1409,40 +1828,34 @@ async function highlightBooleanWidth(value) {
 // Execution :
 
 async function execution3() {
-
     console.log("execution script 3");
-    //notification("alert", "Notification test")
 
+    // Fetch the delivery details
     const deliveryDetails = await fetchDeliveryDetails();
 
-    await fillAddress();
+    // Use the specialized function for address field
+    await fillAddressCombobox();
 
-    autoPlaceHolder("#recipientFirstName", deliveryDetails.firstName.toString());
-    //autoFill("#root > div > div:nth-child(2) > main > div > div > div:nth-child(2) > div.w-full.ml-8 > form > div > div:nth-child(2) > div:nth-child(1) > div.w-full.mr-4.firstname > div > label", deliveryDetails.firstName.toString());
+    // Use fillReactInput for each of the remaining fields
+    await fillReactInput("#recipientFirstName", deliveryDetails.firstName.toString());
+    await fillReactInput("#recipientLastName", deliveryDetails.name.toString());
+    await fillReactInput("#phone1", deliveryDetails.phone.toString());
+    await fillReactInput("#packagesQuantity", deliveryDetails.packageMetrics.totalNumberOfPackages.toString());
+    await fillReactInput("#heaviest", deliveryDetails.packageMetrics.heaviestPackageWeight.toString());
+    await fillReactInput("#weight", deliveryDetails.packageMetrics.heaviestPackageWeight.toString());
+    await fillReactInput("#totalWeight", deliveryDetails.packageMetrics.totalWeight.toString());
+    await fillReactInput("#longest", deliveryDetails.packageMetrics.longestPackage.length.toString());
+    await fillReactInput("#length", deliveryDetails.packageMetrics.longestPackage.length.toString());
 
-    autoPlaceHolder("#recipientLastName", deliveryDetails.name.toString());
-    //autoFill("#recipientLastName", deliveryDetails.name.toString());
+    // Still highlight the boolean selection fields
+    await highlightBooleanHeight(deliveryDetails.packageMetrics.longestPackage.height);
+    await highlightBooleanWidth(deliveryDetails.packageMetrics.longestPackage.width);
 
-    autoPlaceHolder("#phone1", deliveryDetails.phone.toString());
-    //autoFill("#phone1", deliveryDetails.phone.toString());
+    // Optionally, add a small delay between filling operations to ensure the form has time to process each input
+    await delay(300);
 
-    await autoPlaceHolder("#packagesQuantity", deliveryDetails.packageMetrics.totalNumberOfPackages.toString());
-
-    autoPlaceHolder("#heaviest", deliveryDetails.packageMetrics.heaviestPackageWeight.toString());
-    autoPlaceHolder("#weight", deliveryDetails.packageMetrics.heaviestPackageWeight.toString());
-
-    autoPlaceHolder("#totalWeight", deliveryDetails.packageMetrics.totalWeight.toString());
-
-
-    autoPlaceHolder("#longest", deliveryDetails.packageMetrics.longestPackage.length.toString());
-    await autoPlaceHolder("#length", deliveryDetails.packageMetrics.longestPackage.length.toString());
-
-    highlightBooleanHeight(deliveryDetails.packageMetrics.longestPackage.height);
-    highlightBooleanWidth(deliveryDetails.packageMetrics.longestPackage.width);
-
-
+    console.log("Form auto-fill completed");
 }
-
 
 
 // -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
