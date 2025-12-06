@@ -1,5 +1,5 @@
 // ==UserScript==
-// @name         Coliweb Livraison Calculator2
+// @name         Coliweb Livraison Calculator2(testdev)
 // @namespace    cstrm.scripts/colisweb1
 // @version      1.29
 // @downloadURL  https://github.com/ArildWaldan/CWAutoDelivery/raw/main/coliswebAutoDelivery.user.js
@@ -770,7 +770,7 @@ function calculatePackageMetrics(fetchedData) {
     };
 }
 
-let globalCookie = ""; 
+let globalCookie = "";
 async function setColiswebCookie() {
 
     const logID = "Y2FzdG9tZXR6MDEy";
@@ -796,7 +796,7 @@ async function setColiswebCookie() {
     }
 
     try {
-        const response = await makeCORSRequest(url, "POST", headers, JSON.stringify(payload)); 
+        const response = await makeCORSRequest(url, "POST", headers, JSON.stringify(payload));
         console.log("making request for new cookie", response)
 
     } catch (error) {
@@ -805,8 +805,8 @@ async function setColiswebCookie() {
 }
 
 // Function to fetch delivery options
+// Function to fetch delivery options
 async function fetchDeliveryOptions(geocodeData, packageMetrics, postalCode, globalCookie) {
-
 
     console.log("Fetching delivery options with geocode data and package metrics");
 
@@ -820,7 +820,6 @@ async function fetchDeliveryOptions(geocodeData, packageMetrics, postalCode, glo
     const now = new Date(); // Represents the current date and time
     const endDate = new Date(now);
     endDate.setDate(now.getDate() + 2); // Adds 2 days to the current date
-
 
     const payload = {
         "startDate": now.toISOString(),
@@ -912,8 +911,23 @@ async function fetchDeliveryOptions(geocodeData, packageMetrics, postalCode, glo
             const adjustedPrice = priceWithTaxes * 1.0376;
             const roundedPrice = parseFloat(adjustedPrice.toFixed(2));
             console.log("Prix Coliweb + marge:", adjustedPrice);
+
+            // --- NEW CODE START ---
+            // Prepare the details object for the popup
+            const details = {
+                "Nombre de colis": packageMetrics.totalNumberOfPackages,
+                "Poids total": packageMetrics.totalWeight + " kg",
+                "Poids max (colis)": packageMetrics.heaviestPackageWeight + " kg",
+                "Dimensions max": packageMetrics.longestPackage
+                    ? `${packageMetrics.longestPackage.length} x ${packageMetrics.longestPackage.width} x ${packageMetrics.longestPackage.height} cm`
+                    : "N/A"
+            };
+
             LoaderManager.hide();
-            notification("", "Prix livraison: " + roundedPrice + " €");
+            // Pass the details object as the 5th argument
+            notification("", "Prix livraison: " + roundedPrice + " €", null, null, details);
+            // --- NEW CODE END ---
+
             return priceWithTaxes;
         } else {
             LoaderManager.hide();
@@ -930,94 +944,309 @@ async function fetchDeliveryOptions(geocodeData, packageMetrics, postalCode, glo
 }
 
 
-// Custom notifications setup
-let lastNotificationBottom = 0;
-let notificationsCount = 0; // Track the number of active notifications
-let CW_popupWindow = null;
+// Enhanced notification system
+let notificationContainer = null;
+let notificationsCount = 0;
+let notificationQueue = [];
+let isProcessingQueue = false;
 
-function notification(type, message, linkText, linkURL) {
-    const notification = document.createElement("div");
-    notification.innerText = message;
-    notification.style.position = "fixed";
-    notification.style.left = "50%";
-    notification.style.backgroundColor = "#af4c4c";
-    notification.style.color = "white";
-    notification.style.padding = "15px 30px";
-    notification.style.borderRadius = "30px";
-    notification.style.boxShadow = "0 0px 1px rgba(0,0,0,0.2)";
-    notification.style.width = 'auto';
-    notification.style.zIndex = "1000";
-    notification.style.display = "flex";
-    notification.style.flexDirection = "column";
-    notification.style.alignItems = "center";
-    notification.style.justifyContent = "center";
-    notification.style.textAlign = "center";
-    notification.style.font = 'bold 1em / 1.25 Arial, Helvetica, sans-serif';
-    notification.style.fontSize = "110%";
-    notification.style.transition = "all 0.5s ease-in-out";
-    notification.style.opacity = "0";
-    notification.style.transform = "translate(-50%, -100%) scale(0)";
-
-    if (type == "alert") {
-        notification.style.background = "linear-gradient(to right, rgba(175,76,76), rgba(157,68,68))";
-    } else {
-        notification.style.backgroundColor = "#0078d7";
+// Create a container for all notifications if it doesn't exist
+function createNotificationContainer() {
+    if (!notificationContainer) {
+        notificationContainer = document.createElement("div");
+        notificationContainer.id = "tm-notification-container";
+        notificationContainer.style.position = "fixed";
+        notificationContainer.style.top = "50%";
+        notificationContainer.style.left = "50%";
+        notificationContainer.style.transform = "translate(-50%, -50%)";
+        notificationContainer.style.display = "flex";
+        notificationContainer.style.flexDirection = "column";
+        notificationContainer.style.gap = "10px";
+        notificationContainer.style.maxHeight = "80vh";
+        notificationContainer.style.maxWidth = "90vw";
+        notificationContainer.style.overflow = "auto";
+        notificationContainer.style.zIndex = "10000";
+        document.body.appendChild(notificationContainer);
     }
-
-    document.body.appendChild(notification);
-    notificationsCount++;
-
-    // Force reflow/repaint
-    const forcedReflow = notification.offsetHeight;
-
-    if (lastNotificationBottom === 0) {
-        notification.style.top = "50%";
-        notification.style.transform = "translate(-50%, -50%) scale(0)";
-    } else {
-        notification.style.top = `${lastNotificationBottom + 50}px`;
-        notification.style.transform = "translate(-50%, 0) scale(0)";
-    }
-
-    // Delay to allow the browser to render and calculate sizes
-    setTimeout(() => {
-        notification.style.opacity = "1";
-        notification.style.transform = "translate(-50%, -50%) scale(1)";
-        if (lastNotificationBottom !== 0) {
-            notification.style.transform = "translate(-50%, 0) scale(1)";
-        }
-
-        // Update the position for the next notification
-        const notificationRect = notification.getBoundingClientRect();
-        lastNotificationBottom = notificationRect.bottom;
-    }, 10);
-
-    if (linkText && linkURL) {
-        const hyperlink = document.createElement("a");
-        hyperlink.href = linkURL;
-        hyperlink.innerText = ` ${linkText}`;
-        hyperlink.style.color = "#ffff00";
-        hyperlink.style.textDecoration = "underline";
-        hyperlink.addEventListener("click", function(event) {
-            event.preventDefault();
-            CW_popupWindow = window.open(linkURL, "CW_popupWindow", "width=400,height=400,scrollbars=no");
-        });
-
-        notification.appendChild(hyperlink);
-    }
-
-    setTimeout(() => {
-        notification.style.opacity = '0';
-        setTimeout(() => {
-            notification.remove();
-            notificationsCount--;
-            if (notificationsCount === 0) {
-                lastNotificationBottom = 0;
-            }
-        }, 600); // Slightly offset to allow for transition overlap
-    }, 5000);
+    return notificationContainer;
 }
 
+// Process the notification queue
+function processNotificationQueue() {
+    if (isProcessingQueue || notificationQueue.length === 0) return;
 
+    isProcessingQueue = true;
+    const notificationData = notificationQueue.shift();
+    showNotification(notificationData.type, notificationData.message, notificationData.details, notificationData.linkText, notificationData.linkURL);
+
+    setTimeout(() => {
+        isProcessingQueue = false;
+        processNotificationQueue();
+    }, 300);
+}
+
+// Main notification function
+function notification(type, message, linkText, linkURL, details = null) {
+    createNotificationContainer();
+
+    // Add to queue
+    notificationQueue.push({ type, message, details, linkText, linkURL });
+
+    // Process queue if not already processing
+    if (!isProcessingQueue) {
+        processNotificationQueue();
+    }
+}
+
+// Function to show a notification
+function showNotification(type, message, details = null, linkText = null, linkURL = null) {
+    const container = createNotificationContainer();
+
+    // Create notification element
+    const notification = document.createElement("div");
+    notification.className = "tm-notification";
+    notification.style.backgroundColor = type === "alert" ? "#f44336" : "#0078d7";
+    notification.style.color = "white";
+    notification.style.padding = "15px";
+    notification.style.borderRadius = "8px";
+    notification.style.boxShadow = "0 4px 12px rgba(0,0,0,0.3)";
+    notification.style.width = "350px";
+    notification.style.maxWidth = "100%";
+    notification.style.position = "relative";
+    notification.style.opacity = "0";
+    notification.style.transform = "scale(0.95)";
+    notification.style.transition = "all 0.3s ease-out";
+
+    // Add notification header
+    const header = document.createElement("div");
+    header.style.display = "flex";
+    header.style.justifyContent = "space-between";
+    header.style.alignItems = "center";
+    header.style.marginBottom = "10px";
+
+    // Add title based on type
+    const title = document.createElement("div");
+    title.style.fontWeight = "bold";
+    title.style.fontSize = "16px";
+    title.style.display = "flex";
+    title.style.alignItems = "center";
+    title.style.gap = "8px";
+
+    // Add icon based on type
+    const icon = document.createElement("span");
+    if (type === "alert") {
+        icon.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg>`;
+        title.appendChild(icon);
+        title.appendChild(document.createTextNode("Alerte"));
+    } else {
+        icon.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg>`;
+        title.appendChild(icon);
+        title.appendChild(document.createTextNode("Information"));
+    }
+
+    header.appendChild(title);
+
+    // Add close button
+    const closeBtn = document.createElement("button");
+    closeBtn.style.background = "transparent";
+    closeBtn.style.border = "none";
+    closeBtn.style.color = "white";
+    closeBtn.style.cursor = "pointer";
+    closeBtn.style.padding = "0";
+    closeBtn.style.width = "24px";
+    closeBtn.style.height = "24px";
+    closeBtn.style.display = "flex";
+    closeBtn.style.alignItems = "center";
+    closeBtn.style.justifyContent = "center";
+    closeBtn.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>`;
+    closeBtn.addEventListener("click", () => {
+        removeNotification(notification);
+    });
+
+    header.appendChild(closeBtn);
+    notification.appendChild(header);
+
+    // Add content
+    const content = document.createElement("div");
+    content.style.marginBottom = linkText || details ? "10px" : "0";
+    content.style.lineHeight = "1.4";
+    content.style.wordBreak = "break-word";
+    content.textContent = message;
+    notification.appendChild(content);
+
+    // Add details if provided
+    if (details) {
+        const detailsContainer = document.createElement("div");
+        detailsContainer.style.marginTop = "10px";
+        detailsContainer.style.fontSize = "14px";
+        detailsContainer.style.backgroundColor = "rgba(255, 255, 255, 0.1)";
+        detailsContainer.style.padding = "10px";
+        detailsContainer.style.borderRadius = "4px";
+
+        if (typeof details === 'object') {
+            for (const [key, value] of Object.entries(details)) {
+                const detailItem = document.createElement("div");
+                detailItem.style.display = "flex";
+                detailItem.style.justifyContent = "space-between";
+                detailItem.style.marginBottom = "5px";
+
+                const detailKey = document.createElement("span");
+                detailKey.style.fontWeight = "bold";
+                detailKey.textContent = key + ":";
+
+                const detailValue = document.createElement("span");
+                detailValue.textContent = value;
+
+                detailItem.appendChild(detailKey);
+                detailItem.appendChild(detailValue);
+                detailsContainer.appendChild(detailItem);
+            }
+        } else {
+            detailsContainer.textContent = details;
+        }
+
+        notification.appendChild(detailsContainer);
+    }
+
+    // Add link if provided
+    if (linkText && linkURL) {
+        const linkContainer = document.createElement("div");
+        linkContainer.style.marginTop = "10px";
+
+        const link = document.createElement("a");
+        link.href = linkURL;
+        link.textContent = linkText;
+        link.style.color = "#ffffff";
+        link.style.textDecoration = "underline";
+        link.style.display = "inline-block";
+        link.style.padding = "5px 10px";
+        link.style.backgroundColor = "rgba(255, 255, 255, 0.15)";
+        link.style.borderRadius = "4px";
+        link.style.transition = "background-color 0.2s";
+
+        link.addEventListener("mouseover", () => {
+            link.style.backgroundColor = "rgba(255, 255, 255, 0.25)";
+        });
+
+        link.addEventListener("mouseout", () => {
+            link.style.backgroundColor = "rgba(255, 255, 255, 0.15)";
+        });
+
+        link.addEventListener("click", (event) => {
+            event.preventDefault();
+            window.open(linkURL, "CW_popupWindow", "width=800,height=600,scrollbars=yes");
+        });
+
+        linkContainer.appendChild(link);
+        notification.appendChild(linkContainer);
+    }
+
+    // Add notification to container
+    container.appendChild(notification);
+    notificationsCount++;
+
+    // Trigger animation
+    setTimeout(() => {
+        notification.style.opacity = "1";
+        notification.style.transform = "scale(1)";
+    }, 10);
+
+    // Auto-remove after 15 seconds for alert types only
+    if (type === "alert") {
+        setTimeout(() => {
+            if (notification.parentNode) {
+                removeNotification(notification);
+            }
+        }, 15000);
+    }
+
+    // If there are multiple notifications, add a semi-transparent overlay
+    if (notificationsCount > 1) {
+        addOverlay();
+    }
+}
+
+// Function to add a semi-transparent overlay behind notifications
+function addOverlay() {
+    if (!document.getElementById('tm-notification-overlay')) {
+        const overlay = document.createElement("div");
+        overlay.id = "tm-notification-overlay";
+        overlay.style.position = "fixed";
+        overlay.style.top = "0";
+        overlay.style.left = "0";
+        overlay.style.width = "100%";
+        overlay.style.height = "100%";
+        overlay.style.backgroundColor = "rgba(0, 0, 0, 0.5)";
+        overlay.style.zIndex = "9999";
+        document.body.appendChild(overlay);
+
+        overlay.addEventListener('click', () => {
+            // Close all notifications when clicking outside
+            removeAllNotifications();
+        });
+    }
+}
+
+// Function to remove the overlay
+function removeOverlay() {
+    const overlay = document.getElementById('tm-notification-overlay');
+    if (overlay) {
+        overlay.parentNode.removeChild(overlay);
+    }
+}
+
+// Function to remove a notification
+function removeNotification(notification) {
+    notification.style.opacity = "0";
+    notification.style.transform = "scale(0.95)";
+
+    setTimeout(() => {
+        if (notification.parentNode) {
+            notification.parentNode.removeChild(notification);
+            notificationsCount--;
+
+            // Clean up container if no notifications
+            if (notificationsCount === 0) {
+                if (notificationContainer) {
+                    notificationContainer.parentNode.removeChild(notificationContainer);
+                    notificationContainer = null;
+                }
+                removeOverlay();
+            }
+        }
+    }, 300);
+}
+
+// Function to remove all notifications
+function removeAllNotifications() {
+    if (notificationContainer) {
+        const notifications = notificationContainer.querySelectorAll('.tm-notification');
+        notifications.forEach(notification => {
+            removeNotification(notification);
+        });
+    }
+    removeOverlay();
+}
+
+// Function to show delivery quote details
+function showDeliveryQuote(priceWithTaxes, packageMetrics, processedEANs, failedEANs = []) {
+    const adjustedPrice = priceWithTaxes * 1.0376;
+    const roundedPrice = parseFloat(adjustedPrice.toFixed(2));
+
+    const details = {
+        "Prix (HT)": priceWithTaxes.toFixed(2) + " €",
+        "Prix (TTC)": roundedPrice + " €",
+        "Nombre de colis": packageMetrics.totalNumberOfPackages,
+        "Poids total": packageMetrics.totalWeight + " kg",
+        "Dimensions max": `${packageMetrics.longestPackage?.length}×${packageMetrics.longestPackage?.width}×${packageMetrics.longestPackage?.height} cm`
+    };
+
+    if (failedEANs.length > 0) {
+        details["EANs non traités"] = failedEANs.join(", ");
+    }
+
+    notification("", `Prix de livraison Colisweb: ${roundedPrice} €`, null, null, details);
+}
 
 
 
@@ -1191,17 +1420,87 @@ function isElementVisible(element) {
 
 
 
-async function autoFill(selector, value) {
-    let inputField = document.querySelector(selector);
+async function fillReactInput(selector, value) {
+    let element = document.querySelector(selector);
 
-    // Wait until the element is visible
+    // 1. Find the element
+    let attempts = 0;
+    while ((!element || !isElementVisible(element)) && attempts < 20) {
+        await delay(200);
+        element = document.querySelector(selector);
+        attempts++;
+    }
+
+    if (!element) {
+        console.error(`Could not find element: ${selector}`);
+        return;
+    }
+
+    // 2. Handle potential wrapper divs
+    if (element.tagName !== 'INPUT' && element.tagName !== 'TEXTAREA') {
+        const nested = element.querySelector('input');
+        if (nested) element = nested;
+    }
+
+    console.log(`${selector} found. Setting value: ${value}`);
+
+    // 3. Focus and Clear
+    element.focus();
+    // specific hack for some react inputs to ensure they are clean
+    element.value = '';
+
+    // 4. React 16+ State Hack
+    const nativeInputValueSetter = Object.getOwnPropertyDescriptor(
+        window.HTMLInputElement.prototype, "value"
+    ).set;
+    nativeInputValueSetter.call(element, value);
+
+    // 5. Dispatch events (Bubbles is crucial)
+    const eventOpts = { bubbles: true, cancelable: true, view: window };
+    element.dispatchEvent(new Event('input', eventOpts));
+    element.dispatchEvent(new Event('change', eventOpts));
+
+    // 6. Blur to save
+    element.dispatchEvent(new Event('blur', eventOpts));
+}
+
+async function fillAddressCombobox() {
+    console.log("fillAddressCombobox called");
+    if (!deliveryDetails.address) {
+        console.error("No address found in deliveryDetails");
+        return;
+    }
+
+    let addressInput = null;
     do {
-        await delay(500);
-        inputField = document.querySelector(selector);
-    } while (!inputField || !isElementVisible(inputField));
+        addressInput = document.querySelector('[id^="headlessui-combobox-input-"]');
+        await delay(50);
+    } while (!addressInput);
 
-    console.log(`${selector} found and is visible. Setting placeholder.`);
-    inputField.setAttribute('placeholder', value);
+    console.log("Address input field found");
+
+    // Focus the field first
+    addressInput.focus();
+
+    // Set the value
+    addressInput.value = deliveryDetails.address;
+
+    // Dispatch input event to trigger the dropdown
+    addressInput.dispatchEvent(new Event('input', { bubbles: true }));
+
+    // Wait for dropdown to potentially appear
+    await delay(300);
+
+    // Try to find and click the first dropdown option
+    const firstOption = document.querySelector('[id^="headlessui-combobox-option-"]');
+    if (firstOption) {
+        console.log("Found dropdown option, clicking it");
+        firstOption.click();
+    } else {
+        // If no dropdown appears, just trigger change and blur events
+        addressInput.dispatchEvent(new Event('change', { bubbles: true }));
+        addressInput.blur();
+    }
 }
 
 
@@ -1250,8 +1549,8 @@ const logPW = "Y3cxMg=="
 async function execution2() {
 
     console.log("execution script 2 (login)");
-    autoFill("#username", atob(logID));
-    autoFill("#Password", atob(logPW));
+    fillReactInput("#username", atob(logID));
+    fillReactInput("#Password", atob(logPW));
     closePopup('external');
 }
 
@@ -1265,6 +1564,112 @@ async function execution2() {
 
 // SCRIPT 3 : Colisweb Autfill
 // Functions
+
+
+// Function to fetch delivery options (modified)
+
+// -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+// SCRIPT 3 : Colisweb Autofill (Robust 60s Timeout Version)
+// -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+// Helper: robustly waits for an element to appear in the DOM
+function waitForElement(selector, timeout = 60000) {
+    return new Promise((resolve) => {
+        const startTime = Date.now();
+
+        const check = () => {
+            const element = document.querySelector(selector);
+            // Check if element exists and is visible
+            if (element && isElementVisible(element)) {
+                resolve(element);
+            } else if (Date.now() - startTime >= timeout) {
+                console.warn(`Timeout: Could not find element '${selector}' after ${timeout/1000} seconds.`);
+                resolve(null); // Return null so script continues to next field instead of crashing
+            } else {
+                // Keep pinging every 500ms
+                setTimeout(check, 500);
+            }
+        };
+
+        console.log(`Scanning for ${selector}...`);
+        check();
+    });
+}
+
+async function fillReactInput(selector, value) {
+    // 1. Wait up to 60 seconds for the element to appear
+    let element = await waitForElement(selector, 60000);
+
+    if (!element) return; // Skip if timed out
+
+    // 2. Handle wrapper divs (if the selector points to a div, find the input inside)
+    if (element.tagName !== 'INPUT' && element.tagName !== 'TEXTAREA') {
+        const nested = element.querySelector('input');
+        if (nested) element = nested;
+    }
+
+    console.log(`${selector} found. Setting value: ${value}`);
+
+    // 3. Focus and Prepare
+    element.focus();
+    element.value = ''; // Clear existing value slightly helps React reset
+
+    // 4. React 16+ Value Setter Logic (Bypassing React's shadow DOM logic)
+    const nativeInputValueSetter = Object.getOwnPropertyDescriptor(
+        window.HTMLInputElement.prototype, "value"
+    ).set;
+    nativeInputValueSetter.call(element, value);
+
+    // 5. Dispatch Events (Crucial for React validation)
+    const eventOpts = { bubbles: true, cancelable: true, view: window };
+    element.dispatchEvent(new Event('input', eventOpts));
+    await delay(50);
+    element.dispatchEvent(new Event('change', eventOpts));
+    await delay(50);
+    element.dispatchEvent(new Event('blur', eventOpts)); // Blur often triggers the "save"
+}
+
+async function selectOptionByClass(className) {
+    const selector = `.cw-radio.${className}`;
+
+    // Wait up to 60 seconds for the radio button
+    const element = await waitForElement(selector, 60000);
+
+    if (element) {
+        console.log(`Found class .${className}. Clicking.`);
+
+        // Visual Highlight
+        element.style.transition = "all 0.3s";
+        element.style.backgroundColor = "#9fe8f2";
+        element.style.border = "2px solid #0078d7";
+
+        // Click to register
+        element.click();
+    }
+}
+
+// Logic for Heights
+async function highlightBooleanHeight(value) {
+    const val = parseFloat(value);
+    if (val < 150) {
+        await selectOptionByClass("lessThan150");
+    } else if (val >= 150 && val <= 180) {
+        // Try the standard class name, if your site uses a different one for the middle, update it here
+        await selectOptionByClass("between150And180");
+    } else if (val > 180) {
+        await selectOptionByClass("moreThan180");
+    }
+}
+
+// Logic for Widths
+async function highlightBooleanWidth(value) {
+    const val = parseFloat(value);
+    if (val <= 50) {
+        await selectOptionByClass("lessThanOrEqualTo50");
+    } else {
+        await selectOptionByClass("moreThan50");
+    }
+}
 
 // Function to retrieve and log the stored delivery details
 async function fetchDeliveryDetails() {
@@ -1284,165 +1689,71 @@ async function fetchDeliveryDetails() {
 
 
 
-// Listvalues
-async function listvalues(){
-    const keys = await GM.listValues(); // Retrieve all keys
-    console.log("liste des clés retrouvées dans le script 2:", keys)
-}
-
-
-
-
-// Function to attempt to set the address value
-let addressInput = null;
-
-async function fillAddress() {
-    console.log("fillAddress lancée");
-    // Check if the deliveryDetails object contains the address
-    if (deliveryDetails.address) {
-        console.log("searching for input field...");
-        do{
-            addressInput = document.querySelector('[id^="headlessui-combobox-input-"]');
-            await delay(50);
-        }while (!addressInput);
-        if (addressInput) {
-            console.log("Address input field found");
-            addressInput.value = deliveryDetails.address;
-            // Trigger any required events after setting the value
-        } else {
-            console.error("Address input field not found");
-        }
-    }
-}
-
-
-
-//Met place holder automatiquement
-async function autoPlaceHolder(selector, value) {
-    let inputField = document.querySelector(selector);
-
-    do {
-        await delay(500);
-        inputField = document.querySelector(selector);
-    } while (!inputField || !isElementVisible(inputField));
-
-    console.log(`${selector} found and is visible. Setting placeholder.`);
-    inputField.setAttribute('placeholder', value);
-}
-
-
-
-async function highlightBooleanHeight(value) {
-    let boolean = null
-    console.log("Valeur utilisée pour booléen : ", value);
-    let presenceBoolean = null;
-    do {
-        presenceBoolean = document.querySelector("#root > div > div:nth-child(2) > main > div > div > div:nth-child(2) > div.w-full.ml-8 > form > div > div:nth-child(2) > div.flex.mb-4 > div > label.flex.items-center.cursor-pointer.bg-neutral-100.border.border-neutral-100.p-1.rounded-lg.hover\\:border-primary-600.lessThan150");
-        await delay(200);
-    } while (!presenceBoolean);
-    console.log("booléen détecté");
-
-
-    if (value < 150){
-        console.log("condition -150 remplie");
-        boolean = document.querySelector("#root > div > div:nth-child(2) > main > div > div > div:nth-child(2) > div.w-full.ml-8 > form > div > div:nth-child(2) > div.flex.mb-4 > div > label.flex.items-center.cursor-pointer.bg-neutral-100.border.border-neutral-100.p-1.rounded-lg.hover\\:border-primary-600.lessThan150");
-        boolean.style.transition = "all 1s ease-in-out";
-        await delay(10);
-        boolean.style.backgroundColor = '#9fe8f2';
-
-    } else if (value >149 && value <181) {
-        console.log("condition 150<>180 remplie");
-        boolean = document.querySelector("#root > div > div:nth-child(2) > main > div > div > div:nth-child(2) > div.w-full.ml-8 > form > div > div:nth-child(2) > div.flex.mb-4 > div > label.flex.items-center.cursor-pointer.bg-neutral-100.border.border-neutral-100.p-1.rounded-lg.hover\\:border-primary-600.my-6.between150And180");
-        boolean.style.transition = "all 1s ease-in-out";
-        await delay(10);
-        boolean.style.backgroundColor = '#9fe8f2';
-
-    } else if (value >180) {
-        console.log("condition >180 remplie");
-        boolean = document.querySelector("#root > div > div:nth-child(2) > main > div > div > div:nth-child(2) > div.w-full.ml-8 > form > div > div:nth-child(2) > div.flex.mb-4 > div > label.flex.items-center.cursor-pointer.bg-neutral-100.border.border-neutral-100.p-1.rounded-lg.hover\\:border-primary-600.moreThan180");
-        boolean.style.transition = "all 1s ease-in-out";
-        await delay(10);
-        boolean.style.backgroundColor = '#9fe8f2';
-    }
-
-
-}
-
-async function highlightBooleanWidth(value) {
-    let boolean = null
-    console.log("Valeur utilisée pour booléen width: ", value);
-    let presenceBoolean = null;
-    do {
-        presenceBoolean = document.querySelector("#root > div > div:nth-child(2) > main > div > div > div:nth-child(2) > div.w-full.ml-8 > form > div > div:nth-child(2) > div.flex.mb-4 > div > label.flex.items-center.cursor-pointer.bg-neutral-100.border.border-neutral-100.p-1.rounded-lg.hover\\:border-primary-600.mb-6.lessThanOrEqualTo50");
-        await delay(200);
-
-    }while(!presenceBoolean);
-    console.log("booléen width détecté");
-
-    if (value < 51){
-        console.log("condition -50 remplie");
-        boolean = document.querySelector("#root > div > div:nth-child(2) > main > div > div > div:nth-child(2) > div.w-full.ml-8 > form > div > div:nth-child(2) > div.flex.mb-4 > div > label.flex.items-center.cursor-pointer.bg-neutral-100.border.border-neutral-100.p-1.rounded-lg.hover\\:border-primary-600.mb-6.lessThanOrEqualTo50");
-        boolean.style.transition = "all 1s ease-in-out";
-        await delay(10);
-        boolean.style.backgroundColor = '#9fe8f2';
-
-    }else if (value >50) {
-        console.log("condition +50 remplie");
-        boolean = document.querySelector("#root > div > div:nth-child(2) > main > div > div > div:nth-child(2) > div.w-full.ml-8 > form > div > div:nth-child(2) > div.flex.mb-4 > div > label.flex.items-center.cursor-pointer.bg-neutral-100.border.border-neutral-100.p-1.rounded-lg.hover\\:border-primary-600.moreThan50");
-        boolean.style.transition = "all 1s ease-in-out";
-        await delay(10);
-        boolean.style.backgroundColor = '#9fe8f2';
-
-    }else {
-        console.log("erreur dans la dimension")
-    }
-
-
-}
-
-
-
-
+// -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+// EXECUTION SCRIPT 3
 // -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 
-// SCRIPT 3 : Colisweb Autofill
-// Execution :
-
 async function execution3() {
+    console.log("Starting Execution Script 3 (60s Timeout Mode)");
 
-    console.log("execution script 3");
-    //notification("alert", "Notification test")
-
+    // Fetch the delivery details
     const deliveryDetails = await fetchDeliveryDetails();
 
-    await fillAddress();
+    if (!deliveryDetails.packageMetrics) {
+        console.log("No package metrics found in GM storage.");
+        return;
+    }
 
-    autoPlaceHolder("#recipientFirstName", deliveryDetails.firstName.toString());
-    //autoFill("#root > div > div:nth-child(2) > main > div > div > div:nth-child(2) > div.w-full.ml-8 > form > div > div:nth-child(2) > div:nth-child(1) > div.w-full.mr-4.firstname > div > label", deliveryDetails.firstName.toString());
+    // --- EXECUTION FLOW ---
+    // Note: We use 'await' here to ensure we don't try to fill the Weight
+    // before the Quantity field has even rendered (which is common in React).
+    // Each function now waits up to 60s, so if the page is slow, the script simply pauses.
 
-    autoPlaceHolder("#recipientLastName", deliveryDetails.name.toString());
-    //autoFill("#recipientLastName", deliveryDetails.name.toString());
+    // 1. Address
+    await fillAddressCombobox();
 
-    autoPlaceHolder("#phone1", deliveryDetails.phone.toString());
-    //autoFill("#phone1", deliveryDetails.phone.toString());
+    // 2. Client Info (These usually load together)
+    // We can run these in parallel to save time, but sequential is safer for "tabbing" logic
+    await fillReactInput("#recipientFirstName", deliveryDetails.firstName || ".");
+    await fillReactInput("#recipientLastName", deliveryDetails.name || ".");
+    await fillReactInput("#phone1", deliveryDetails.phone || ".");
 
-    await autoPlaceHolder("#packagesQuantity", deliveryDetails.packageMetrics.totalNumberOfPackages.toString());
+    // 3. Package Quantity (Crucial: usually triggers the rendering of weight fields)
+    const pkgCount = String(deliveryDetails.packageMetrics.totalNumberOfPackages);
+    await fillReactInput("#packagesQuantity", pkgCount);
 
-    autoPlaceHolder("#heaviest", deliveryDetails.packageMetrics.heaviestPackageWeight.toString());
-    autoPlaceHolder("#weight", deliveryDetails.packageMetrics.heaviestPackageWeight.toString());
+    // Small delay to allow the React page to render the new fields based on quantity
+    await delay(500);
 
-    autoPlaceHolder("#totalWeight", deliveryDetails.packageMetrics.totalWeight.toString());
+    // 4. Weight Info
+    const heaviest = String(deliveryDetails.packageMetrics.heaviestPackageWeight);
+    const totalW = String(deliveryDetails.packageMetrics.totalWeight);
 
+    // Try filling both ID variations for single weight
+    if (document.querySelector("#heaviest")) {
+        await fillReactInput("#heaviest", heaviest);
+    } else {
+        await fillReactInput("#weight", heaviest);
+    }
 
-    autoPlaceHolder("#longest", deliveryDetails.packageMetrics.longestPackage.length.toString());
-    await autoPlaceHolder("#length", deliveryDetails.packageMetrics.longestPackage.length.toString());
+    // Total Weight
+    await fillReactInput("#totalWeight", totalW);
 
-    highlightBooleanHeight(deliveryDetails.packageMetrics.longestPackage.height);
-    highlightBooleanWidth(deliveryDetails.packageMetrics.longestPackage.width);
+    // 5. Dimensions
+    const longest = String(deliveryDetails.packageMetrics.longestPackage?.length || 0);
+    // Determine which ID exists
+    const lengthSelector = document.querySelector("#longest") ? "#longest" : "#length";
+    await fillReactInput(lengthSelector, longest);
 
+    // 6. Radio Highlights
+    if (deliveryDetails.packageMetrics.longestPackage) {
+        // Run these in parallel as they are independent
+        highlightBooleanHeight(deliveryDetails.packageMetrics.longestPackage.height);
+        highlightBooleanWidth(deliveryDetails.packageMetrics.longestPackage.width);
+    }
 
+    console.log("Script 3: Auto-fill sequence finished.");
 }
-
 
 
 // -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
