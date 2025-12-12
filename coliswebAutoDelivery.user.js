@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Coliweb Livraison Calculator2(testdev)
 // @namespace    cstrm.scripts/colisweb1
-// @version      1.29
+// @version      1.30
 // @downloadURL  https://github.com/ArildWaldan/CWAutoDelivery/raw/main/coliswebAutoDelivery.user.js
 // @updateURL    https://github.com/ArildWaldan/CWAutoDelivery/raw/main/coliswebAutoDelivery.user.js
 // @description  Fetch and log package specifications
@@ -1573,7 +1573,7 @@ async function execution2() {
 // -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 
 // Helper: robustly waits for an element to appear in the DOM
-function waitForElement(selector, timeout = 60000) {
+function waitForElement(selector, timeout = 300000) {
     return new Promise((resolve) => {
         const startTime = Date.now();
 
@@ -1694,7 +1694,7 @@ async function fetchDeliveryDetails() {
 // -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 
 async function execution3() {
-    console.log("Starting Execution Script 3 (60s Timeout Mode)");
+    console.log("Starting Execution Script 3 (5min Timeout Mode)");
 
     // Fetch the delivery details
     const deliveryDetails = await fetchDeliveryDetails();
@@ -1705,22 +1705,21 @@ async function execution3() {
     }
 
     // --- EXECUTION FLOW ---
-    // Note: We use 'await' here to ensure we don't try to fill the Weight
-    // before the Quantity field has even rendered (which is common in React).
-    // Each function now waits up to 60s, so if the page is slow, the script simply pauses.
 
     // 1. Address
     await fillAddressCombobox();
 
     // 2. Client Info (These usually load together)
-    // We can run these in parallel to save time, but sequential is safer for "tabbing" logic
     await fillReactInput("#recipientFirstName", deliveryDetails.firstName || ".");
     await fillReactInput("#recipientLastName", deliveryDetails.name || ".");
     await fillReactInput("#phone1", deliveryDetails.phone || ".");
 
-    // 3. Package Quantity (Crucial: usually triggers the rendering of weight fields)
-    const pkgCount = String(deliveryDetails.packageMetrics.totalNumberOfPackages);
-    await fillReactInput("#packagesQuantity", pkgCount);
+    // 3. Package Quantity
+    // Ensure we have an integer for logic checks
+    const pkgCountInt = parseInt(deliveryDetails.packageMetrics.totalNumberOfPackages, 10);
+    const pkgCountStr = String(pkgCountInt);
+
+    await fillReactInput("#packagesQuantity", pkgCountStr);
 
     // Small delay to allow the React page to render the new fields based on quantity
     await delay(500);
@@ -1730,14 +1729,20 @@ async function execution3() {
     const totalW = String(deliveryDetails.packageMetrics.totalWeight);
 
     // Try filling both ID variations for single weight
+    // If pkgCount is 1, the field is likely #weight. If >1, it is #heaviest.
     if (document.querySelector("#heaviest")) {
         await fillReactInput("#heaviest", heaviest);
     } else {
         await fillReactInput("#weight", heaviest);
     }
 
-    // Total Weight
-    await fillReactInput("#totalWeight", totalW);
+    // Total Weight Logic
+    // ONLY attempt to fill totalWeight if there is more than 1 package.
+    if (pkgCountInt > 1) {
+        await fillReactInput("#totalWeight", totalW);
+    } else {
+        console.log("Single package detected: Skipping '#totalWeight' field autofill.");
+    }
 
     // 5. Dimensions
     const longest = String(deliveryDetails.packageMetrics.longestPackage?.length || 0);
